@@ -12,7 +12,9 @@ export type User = {
   email: string;
   first_name: string;
   last_name: string;
+  patronymic: string;
   phone: string;
+  driver_license_number: string;
   role: UserRole;
   verification_status: VerificationStatus;
   balance: string;

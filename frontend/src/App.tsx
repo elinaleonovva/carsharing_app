@@ -10,13 +10,15 @@ type AuthForm = {
   password_confirm: string;
   first_name: string;
   last_name: string;
+  patronymic: string;
   phone: string;
+  driver_license_number: string;
 };
-
-type ProfileForm = Pick<User, "email" | "first_name" | "last_name" | "phone">;
 
 const TOKEN_KEY = "carsharing_token";
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const phonePattern = /^\+?[\d\s()-]+$/;
+const driverLicenseSeriesPattern = /^[0-9A-Za-zА-Яа-яЁё]{4}$/;
 
 const initialAuthForm: AuthForm = {
   email: "",
@@ -24,14 +26,9 @@ const initialAuthForm: AuthForm = {
   password_confirm: "",
   first_name: "",
   last_name: "",
+  patronymic: "",
   phone: "",
-};
-
-const verificationLabels: Record<User["verification_status"], string> = {
-  not_requested: "Заявка не отправлена",
-  pending: "На проверке",
-  approved: "Одобрен",
-  rejected: "Отклонен",
+  driver_license_number: "",
 };
 
 function normalizeMessage(message: string): string {
@@ -67,6 +64,8 @@ function getErrorMessage(error: unknown): string {
 
 function validateAuthForm(mode: AuthMode, form: AuthForm): string | null {
   const email = form.email.trim().toLowerCase();
+  const phoneDigits = form.phone.replace(/\D/g, "");
+  const license = form.driver_license_number.replace(/\s+/g, "").toUpperCase();
 
   if (!email) {
     return "Введите email";
@@ -82,6 +81,56 @@ function validateAuthForm(mode: AuthMode, form: AuthForm): string | null {
     }
 
     return null;
+  }
+
+  if (!form.last_name.trim()) {
+    return "Введите фамилию";
+  }
+
+  if (!form.first_name.trim()) {
+    return "Введите имя";
+  }
+
+  if (!form.patronymic.trim()) {
+    return "Введите отчество";
+  }
+
+  if (!form.phone.trim()) {
+    return "Введите номер телефона";
+  }
+
+  if (!phonePattern.test(form.phone.trim())) {
+    return "Введите корректный номер телефона";
+  }
+
+  if (phoneDigits.length < 10 || phoneDigits.length > 15) {
+    return "Номер телефона должен содержать от 10 до 15 цифр";
+  }
+
+  if (!license) {
+    return "Введите номер водительского удостоверения";
+  }
+
+  if (license.length !== 10) {
+    return "Введите номер водительского удостоверения в формате XX XX YYYYYY";
+  }
+
+  const licenseSeries = license.slice(0, 4);
+  const licenseNumber = license.slice(4);
+  const seriesDigitCount = [...licenseSeries].filter((char) => /\d/.test(char)).length;
+  const seriesLetterCount = [...licenseSeries].filter((char) => /[A-Za-zА-Яа-яЁё]/.test(char)).length;
+
+  if (!driverLicenseSeriesPattern.test(licenseSeries) || !/^\d{6}$/.test(licenseNumber)) {
+    return "Введите номер водительского удостоверения в формате XX XX YYYYYY";
+  }
+
+  if (
+    !(
+      (seriesDigitCount === 4 && seriesLetterCount === 0) ||
+      (seriesDigitCount === 2 && seriesLetterCount === 2)
+    )
+  ) {
+    return "Серия ВУ должна содержать 4 цифры или 2 цифры и 2 буквы";
   }
 
   if (!form.password.trim()) {
@@ -108,12 +157,6 @@ function App() {
   const [token, setToken] = useState(() => localStorage.getItem(TOKEN_KEY));
   const [user, setUser] = useState<User | null>(null);
   const [authForm, setAuthForm] = useState<AuthForm>(initialAuthForm);
-  const [profileForm, setProfileForm] = useState<ProfileForm>({
-    email: "",
-    first_name: "",
-    last_name: "",
-    phone: "",
-  });
   const [message, setMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
@@ -127,12 +170,6 @@ function App() {
       .me(token)
       .then((profile) => {
         setUser(profile);
-        setProfileForm({
-          email: profile.email,
-          first_name: profile.first_name,
-          last_name: profile.last_name,
-          phone: profile.phone,
-        });
       })
       .catch(() => {
         localStorage.removeItem(TOKEN_KEY);
@@ -166,59 +203,16 @@ function App() {
               password_confirm: authForm.password_confirm,
               first_name: authForm.first_name.trim(),
               last_name: authForm.last_name.trim(),
+              patronymic: authForm.patronymic.trim(),
               phone: authForm.phone.trim(),
+              driver_license_number: authForm.driver_license_number.trim(),
             });
 
       localStorage.setItem(TOKEN_KEY, response.token);
       setToken(response.token);
       setUser(response.user);
-      setProfileForm({
-        email: response.user.email,
-        first_name: response.user.first_name,
-        last_name: response.user.last_name,
-        phone: response.user.phone,
-      });
       setAuthForm(initialAuthForm);
-      setMessage(mode === "login" ? "Вход выполнен" : "Аккаунт создан");
-    } catch (error) {
-      setMessage(getErrorMessage(error));
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleProfileSubmit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (!token) {
-      return;
-    }
-
-    setIsLoading(true);
-    setMessage("");
-
-    try {
-      const profile = await api.updateMe(token, profileForm);
-      setUser(profile);
-      setMessage("Профиль обновлен");
-    } catch (error) {
-      setMessage(getErrorMessage(error));
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleVerificationRequest = async () => {
-    if (!token) {
-      return;
-    }
-
-    setIsLoading(true);
-    setMessage("");
-
-    try {
-      const response = await api.requestVerification(token);
-      setUser(response.user);
-      setMessage("Заявка отправлена администратору");
+      setMessage(mode === "login" ? "Вход выполнен" : "");
     } catch (error) {
       setMessage(getErrorMessage(error));
     } finally {
@@ -316,16 +310,6 @@ function App() {
                   </label>
                   <div className="two-columns">
                     <label>
-                      Имя
-                      <input
-                        value={authForm.first_name}
-                        onChange={(event) =>
-                          setAuthForm((form) => ({ ...form, first_name: event.target.value }))
-                        }
-                        autoComplete="given-name"
-                      />
-                    </label>
-                    <label>
                       Фамилия
                       <input
                         value={authForm.last_name}
@@ -333,9 +317,32 @@ function App() {
                           setAuthForm((form) => ({ ...form, last_name: event.target.value }))
                         }
                         autoComplete="family-name"
+                        required
+                      />
+                    </label>
+                    <label>
+                      Имя
+                      <input
+                        value={authForm.first_name}
+                        onChange={(event) =>
+                          setAuthForm((form) => ({ ...form, first_name: event.target.value }))
+                        }
+                        autoComplete="given-name"
+                        required
                       />
                     </label>
                   </div>
+                  <label>
+                    Отчество
+                    <input
+                      value={authForm.patronymic}
+                      onChange={(event) =>
+                        setAuthForm((form) => ({ ...form, patronymic: event.target.value }))
+                      }
+                      autoComplete="additional-name"
+                      required
+                    />
+                  </label>
                   <label>
                     Телефон
                     <input
@@ -344,6 +351,22 @@ function App() {
                         setAuthForm((form) => ({ ...form, phone: event.target.value }))
                       }
                       autoComplete="tel"
+                      placeholder="+7 999 000-11-22"
+                      required
+                    />
+                  </label>
+                  <label>
+                    Номер водительского удостоверения
+                    <input
+                      value={authForm.driver_license_number}
+                      onChange={(event) =>
+                        setAuthForm((form) => ({
+                          ...form,
+                          driver_license_number: event.target.value,
+                        }))
+                      }
+                      placeholder="12 34 123456"
+                      required
                     />
                   </label>
                   <div className="two-columns">
@@ -384,88 +407,17 @@ function App() {
             </form>
           </div>
         ) : (
-          <div className="dashboard">
-            <header className="dashboard-header">
-              <div>
-                <span className="eyebrow">Личный кабинет</span>
-                <h2>{user.first_name || user.email}</h2>
-              </div>
-              <button className="ghost-button" type="button" onClick={handleLogout}>
-                Выйти
-              </button>
-            </header>
-
-            <div className="status-strip">
-              <div>
-                <span>Роль</span>
-                <strong>{user.role === "admin" ? "Администратор" : "Пользователь"}</strong>
-              </div>
-              <div>
-                <span>Проверка</span>
-                <strong>{verificationLabels[user.verification_status]}</strong>
-              </div>
-              <div>
-                <span>Доступ к сервису</span>
-                <strong>{user.can_use_service ? "Разрешен" : "Ожидает подтверждения"}</strong>
-              </div>
-            </div>
-
-            <form className="form-stack" onSubmit={handleProfileSubmit}>
-              <div className="two-columns">
-                <label>
-                  Email
-                  <input
-                    value={profileForm.email}
-                    onChange={(event) =>
-                      setProfileForm((form) => ({ ...form, email: event.target.value }))
-                    }
-                    type="email"
-                  />
-                </label>
-                <label>
-                  Телефон
-                  <input
-                    value={profileForm.phone}
-                    onChange={(event) =>
-                      setProfileForm((form) => ({ ...form, phone: event.target.value }))
-                    }
-                  />
-                </label>
-              </div>
-              <div className="two-columns">
-                <label>
-                  Имя
-                  <input
-                    value={profileForm.first_name}
-                    onChange={(event) =>
-                      setProfileForm((form) => ({ ...form, first_name: event.target.value }))
-                    }
-                  />
-                </label>
-                <label>
-                  Фамилия
-                  <input
-                    value={profileForm.last_name}
-                    onChange={(event) =>
-                      setProfileForm((form) => ({ ...form, last_name: event.target.value }))
-                    }
-                  />
-                </label>
-              </div>
-              <div className="button-row">
-                <button className="primary-button" disabled={isLoading} type="submit">
-                  Сохранить профиль
-                </button>
-                <button
-                  className="secondary-button"
-                  disabled={isLoading || user.verification_status === "approved"}
-                  type="button"
-                  onClick={handleVerificationRequest}
-                >
-                  Отправить заявку
-                </button>
-              </div>
-            </form>
+          <div className="status-card">
+            <span className="eyebrow">Статус заявки</span>
+            <h2>{user.can_use_service ? "Доступ открыт" : "Ваша заявка отправлена"}</h2>
+            <p>
+              {user.can_use_service
+                ? "Администратор подтвердил данные, можно переходить к сервису"
+                : "Дождитесь, пока администратор проверит данные и откроет доступ"}
+            </p>
+            <button className="ghost-button" type="button" onClick={handleLogout}>
+              Выйти
+            </button>
           </div>
         )}
 

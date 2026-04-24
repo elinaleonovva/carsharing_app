@@ -13,6 +13,8 @@ class CustomUserAdmin(UserAdmin):
                 "fields": (
                     "role",
                     "verification_status",
+                    "patronymic",
+                    "driver_license_number",
                     "phone",
                     "balance",
                     "is_blocked",
@@ -29,4 +31,12 @@ class CustomUserAdmin(UserAdmin):
         "is_staff",
     )
     list_filter = ("role", "verification_status", "is_blocked", "is_staff", "is_active")
-    search_fields = ("username", "email", "first_name", "last_name", "phone")
+    search_fields = (
+        "username",
+        "email",
+        "first_name",
+        "last_name",
+        "patronymic",
+        "driver_license_number",
+        "phone",
+    )

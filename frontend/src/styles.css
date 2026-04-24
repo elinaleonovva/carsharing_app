@@ -101,7 +101,8 @@ button {
 }
 
 .auth-card,
-.dashboard {
+.dashboard,
+.status-card {
   width: min(100%, 680px);
   margin: 0 auto;
   padding: 30px;
@@ -208,6 +209,24 @@ button:disabled {
   gap: 24px;
 }
 
+.status-card {
+  display: grid;
+  gap: 14px;
+}
+
+.status-card h2 {
+  margin: 0;
+  font-size: 34px;
+}
+
+.status-card p {
+  max-width: 520px;
+  margin: 0 0 8px;
+  color: #4f5d52;
+  font-size: 17px;
+  line-height: 1.55;
+}
+
 .dashboard-header {
   display: flex;
   align-items: flex-start;
@@ -303,7 +322,8 @@ button:disabled {
   }
 
   .auth-card,
-  .dashboard {
+  .dashboard,
+  .status-card {
     padding: 22px;
   }
 

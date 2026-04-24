@@ -1,3 +1,5 @@
+import re
+
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
@@ -5,8 +7,47 @@ from rest_framework import serializers
 from .models import User
 
 
+PHONE_ALLOWED_RE = re.compile(r"^\+?[\d\s()\-]+$")
+DRIVER_LICENSE_SERIES_RE = re.compile(r"^[0-9A-Za-zА-Яа-яЁё]{4}$")
+
+
 def clean_message(message: str) -> str:
     return message.strip().rstrip(".!?")
+
+
+def validate_phone_number(value: str) -> str:
+    phone = value.strip()
+    digits = re.sub(r"\D", "", phone)
+
+    if not phone:
+        raise serializers.ValidationError("Введите номер телефона")
+    if not PHONE_ALLOWED_RE.fullmatch(phone):
+        raise serializers.ValidationError("Введите корректный номер телефона")
+    if not 10 <= len(digits) <= 15:
+        raise serializers.ValidationError("Номер телефона должен содержать от 10 до 15 цифр")
+
+    return phone
+
+
+def normalize_driver_license(value: str) -> str:
+    compact = re.sub(r"\s+", "", value.strip()).upper()
+
+    if len(compact) != 10:
+        raise serializers.ValidationError("Введите номер водительского удостоверения в формате XX XX YYYYYY")
+
+    series = compact[:4]
+    number = compact[4:]
+
+    if not DRIVER_LICENSE_SERIES_RE.fullmatch(series) or not number.isdigit():
+        raise serializers.ValidationError("Введите номер водительского удостоверения в формате XX XX YYYYYY")
+
+    digit_count = sum(char.isdigit() for char in series)
+    letter_count = sum(char.isalpha() for char in series)
+
+    if not ((digit_count == 4 and letter_count == 0) or (digit_count == 2 and letter_count == 2)):
+        raise serializers.ValidationError("Серия ВУ должна содержать 4 цифры или 2 цифры и 2 буквы")
+
+    return f"{series[:2]} {series[2:]} {number}"
 
 
 def translate_password_errors(exc: DjangoValidationError) -> list[str]:
@@ -49,7 +90,9 @@ class UserSerializer(serializers.ModelSerializer):
             "email",
             "first_name",
             "last_name",
+            "patronymic",
             "phone",
+            "driver_license_number",
             "role",
             "verification_status",
             "balance",
@@ -80,7 +123,19 @@ class UserSerializer(serializers.ModelSerializer):
         return email
 
     def validate_phone(self, value):
-        return value.strip()
+        return validate_phone_number(value)
+
+    def validate_driver_license_number(self, value):
+        driver_license_number = normalize_driver_license(value)
+        queryset = User.objects.filter(driver_license_number=driver_license_number)
+
+        if self.instance is not None:
+            queryset = queryset.exclude(pk=self.instance.pk)
+
+        if queryset.exists():
+            raise serializers.ValidationError("Пользователь с таким водительским удостоверением уже зарегистрирован")
+
+        return driver_license_number
 
 
 class RegisterSerializer(serializers.ModelSerializer):
@@ -111,6 +166,46 @@ class RegisterSerializer(serializers.ModelSerializer):
             "min_length": "Пароль должен содержать не менее 8 символов",
         },
     )
+    first_name = serializers.CharField(
+        required=True,
+        allow_blank=False,
+        error_messages={
+            "blank": "Введите имя",
+            "required": "Введите имя",
+        },
+    )
+    last_name = serializers.CharField(
+        required=True,
+        allow_blank=False,
+        error_messages={
+            "blank": "Введите фамилию",
+            "required": "Введите фамилию",
+        },
+    )
+    patronymic = serializers.CharField(
+        required=True,
+        allow_blank=False,
+        error_messages={
+            "blank": "Введите отчество",
+            "required": "Введите отчество",
+        },
+    )
+    phone = serializers.CharField(
+        required=True,
+        allow_blank=False,
+        error_messages={
+            "blank": "Введите номер телефона",
+            "required": "Введите номер телефона",
+        },
+    )
+    driver_license_number = serializers.CharField(
+        required=True,
+        allow_blank=False,
+        error_messages={
+            "blank": "Введите номер водительского удостоверения",
+            "required": "Введите номер водительского удостоверения",
+        },
+    )
 
     class Meta:
         model = User
@@ -120,7 +215,9 @@ class RegisterSerializer(serializers.ModelSerializer):
             "password_confirm",
             "first_name",
             "last_name",
+            "patronymic",
             "phone",
+            "driver_license_number",
         )
 
     def validate(self, attrs):
@@ -140,13 +237,29 @@ class RegisterSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Пользователь с таким email уже зарегистрирован")
         return email
 
-    def validate_phone(self, value):
+    def validate_first_name(self, value):
         return value.strip()
+
+    def validate_last_name(self, value):
+        return value.strip()
+
+    def validate_patronymic(self, value):
+        return value.strip()
+
+    def validate_phone(self, value):
+        return validate_phone_number(value)
+
+    def validate_driver_license_number(self, value):
+        driver_license_number = normalize_driver_license(value)
+        if User.objects.filter(driver_license_number=driver_license_number).exists():
+            raise serializers.ValidationError("Пользователь с таким водительским удостоверением уже зарегистрирован")
+        return driver_license_number
 
     def create(self, validated_data):
         validated_data.pop("password_confirm")
         password = validated_data.pop("password")
         user = User(**validated_data)
+        user.verification_status = User.VerificationStatus.PENDING
         user.set_password(password)
         user.save()
         return user

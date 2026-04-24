@@ -22,6 +22,13 @@ class User(AbstractUser):
         default=Role.USER,
     )
     email = models.EmailField("email address", unique=True)
+    patronymic = models.CharField(max_length=150, blank=True)
+    driver_license_number = models.CharField(
+        max_length=13,
+        unique=True,
+        null=True,
+        blank=True,
+    )
     verification_status = models.CharField(
         max_length=24,
         choices=VerificationStatus.choices,
