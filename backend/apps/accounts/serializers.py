@@ -7,7 +7,7 @@ from rest_framework import serializers
 from .models import User
 
 
-PHONE_ALLOWED_RE = re.compile(r"^\+?[\d\s()\-]+$")
+PHONE_ALLOWED_RE = re.compile(r"^\d+$")
 DRIVER_LICENSE_SERIES_RE = re.compile(r"^[0-9A-Za-zА-Яа-яЁё]{4}$")
 
 
@@ -17,14 +17,13 @@ def clean_message(message: str) -> str:
 
 def validate_phone_number(value: str) -> str:
     phone = value.strip()
-    digits = re.sub(r"\D", "", phone)
 
     if not phone:
         raise serializers.ValidationError("Введите номер телефона")
     if not PHONE_ALLOWED_RE.fullmatch(phone):
-        raise serializers.ValidationError("Введите корректный номер телефона")
-    if not 10 <= len(digits) <= 15:
-        raise serializers.ValidationError("Номер телефона должен содержать от 10 до 15 цифр")
+        raise serializers.ValidationError("Номер телефона должен содержать только цифры")
+    if len(phone) != 11:
+        raise serializers.ValidationError("Номер телефона должен содержать 11 цифр")
 
     return phone
 

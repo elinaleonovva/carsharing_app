@@ -17,7 +17,7 @@ type AuthForm = {
 
 const TOKEN_KEY = "carsharing_token";
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const phonePattern = /^\+?[\d\s()-]+$/;
+const phonePattern = /^\d+$/;
 const driverLicenseSeriesPattern = /^[0-9A-Za-zА-Яа-яЁё]{4}$/;
 
 const initialAuthForm: AuthForm = {
@@ -64,7 +64,6 @@ function getErrorMessage(error: unknown): string {
 
 function validateAuthForm(mode: AuthMode, form: AuthForm): string | null {
   const email = form.email.trim().toLowerCase();
-  const phoneDigits = form.phone.replace(/\D/g, "");
   const license = form.driver_license_number.replace(/\s+/g, "").toUpperCase();
 
   if (!email) {
@@ -100,11 +99,11 @@ function validateAuthForm(mode: AuthMode, form: AuthForm): string | null {
   }
 
   if (!phonePattern.test(form.phone.trim())) {
-    return "Введите корректный номер телефона";
+    return "Номер телефона должен содержать только цифры";
   }
 
-  if (phoneDigits.length < 10 || phoneDigits.length > 15) {
-    return "Номер телефона должен содержать от 10 до 15 цифр";
+  if (form.phone.trim().length !== 11) {
+    return "Номер телефона должен содержать 11 цифр";
   }
 
   if (!license) {
@@ -251,14 +250,20 @@ function App() {
               <button
                 className={mode === "login" ? "active" : ""}
                 type="button"
-                onClick={() => setMode("login")}
+                onClick={() => {
+                  setMode("login");
+                  setMessage("");
+                }}
               >
                 Вход
               </button>
               <button
                 className={mode === "register" ? "active" : ""}
                 type="button"
-                onClick={() => setMode("register")}
+                onClick={() => {
+                  setMode("register");
+                  setMessage("");
+                }}
               >
                 Регистрация
               </button>
@@ -351,7 +356,7 @@ function App() {
                         setAuthForm((form) => ({ ...form, phone: event.target.value }))
                       }
                       autoComplete="tel"
-                      placeholder="+7 999 000-11-22"
+                      placeholder="79990001122"
                       required
                     />
                   </label>
