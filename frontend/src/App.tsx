@@ -692,12 +692,12 @@ function UserDashboard({ token, user, onLogout }: { token: string; user: User; o
             <div className="hero-row">
               <div>
                 <span className="eyebrow">Карта Москвы</span>
-                <h2>Все машины на карте и маршрут до выбранной точки</h2>
+                <h2>Машины рядом на карте</h2>
               </div>
             </div>
             <p className="helper-text">
               Нажмите на карту, чтобы поставить свою точку. Затем выберите машину: маршрут
-              построится автоматически, а карточка машины появится прямо поверх карты.
+              построится автоматически
             </p>
           </div>
 
