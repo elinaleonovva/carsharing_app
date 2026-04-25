@@ -1,3 +1,4 @@
+from datetime import timedelta
 from decimal import Decimal
 
 from django.db import transaction
@@ -5,6 +6,9 @@ from django.utils import timezone
 from rest_framework import serializers
 
 from .models import Booking, Car, Tariff, TimeCoefficient, Trip, WalletTransaction
+
+
+BOOKING_TTL_MINUTES = 15
 
 
 def get_tariff() -> Tariff:
@@ -35,8 +39,38 @@ def ensure_user_can_use_service(user) -> None:
 
 
 @transaction.atomic
+def expire_stale_bookings() -> int:
+    now = timezone.now()
+    cutoff = now - timedelta(minutes=BOOKING_TTL_MINUTES)
+    stale_bookings = list(
+        Booking.objects.select_related("car").filter(
+            status=Booking.Status.ACTIVE,
+            created_at__lt=cutoff,
+        )
+    )
+
+    if not stale_bookings:
+        return 0
+
+    expired_car_ids: set[int] = set()
+    for booking in stale_bookings:
+        booking.status = Booking.Status.CANCELLED
+        booking.closed_at = now
+        booking.save(update_fields=["status", "closed_at"])
+        expired_car_ids.add(booking.car_id)
+
+    if expired_car_ids:
+        Car.objects.filter(id__in=expired_car_ids, status=Car.Status.BOOKED).update(
+            status=Car.Status.AVAILABLE
+        )
+
+    return len(stale_bookings)
+
+
+@transaction.atomic
 def create_booking(user, car: Car) -> Booking:
     ensure_user_can_use_service(user)
+    expire_stale_bookings()
 
     if Booking.objects.filter(user=user, status=Booking.Status.ACTIVE).exists():
         raise serializers.ValidationError("У вас уже есть активное бронирование")
@@ -69,6 +103,7 @@ def cancel_booking(booking: Booking) -> Booking:
 @transaction.atomic
 def start_trip(user, car: Car, latitude, longitude) -> Trip:
     ensure_user_can_use_service(user)
+    expire_stale_bookings()
 
     if Trip.objects.filter(user=user, status=Trip.Status.ACTIVE).exists():
         raise serializers.ValidationError("У вас уже есть активная поездка")
@@ -76,6 +111,10 @@ def start_trip(user, car: Car, latitude, longitude) -> Trip:
     tariff = get_tariff()
     if user.balance < tariff.min_start_balance:
         raise serializers.ValidationError("Недостаточно средств для начала поездки")
+
+    other_booking = Booking.objects.filter(user=user, status=Booking.Status.ACTIVE).exclude(car=car).first()
+    if other_booking is not None:
+        raise serializers.ValidationError("Сначала отмените текущую бронь или начните поездку на забронированной машине")
 
     booking = Booking.objects.filter(user=user, car=car, status=Booking.Status.ACTIVE).first()
     if car.status == Car.Status.BOOKED and booking is None:

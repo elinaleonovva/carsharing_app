@@ -19,7 +19,15 @@ from .serializers import (
     TripSerializer,
     WalletTransactionSerializer,
 )
-from .services import cancel_booking, create_booking, finish_trip, get_tariff, start_trip, top_up_wallet
+from .services import (
+    cancel_booking,
+    create_booking,
+    expire_stale_bookings,
+    finish_trip,
+    get_tariff,
+    start_trip,
+    top_up_wallet,
+)
 
 
 class ServiceAccessMixin:
@@ -40,6 +48,7 @@ class CarsAPIView(ServiceAccessMixin, APIView):
         if access_error:
             return access_error
 
+        expire_stale_bookings()
         cars = Car.objects.exclude(status__in=[Car.Status.SERVICE, Car.Status.INACTIVE])
         return Response(CarSerializer(cars, many=True).data)
 
@@ -50,6 +59,7 @@ class BookingsAPIView(ServiceAccessMixin, APIView):
         if access_error:
             return access_error
 
+        expire_stale_bookings()
         booking = Booking.objects.filter(user=request.user, status=Booking.Status.ACTIVE).first()
         return Response(BookingSerializer(booking).data if booking else None)
 
@@ -81,6 +91,7 @@ class TripsAPIView(ServiceAccessMixin, APIView):
         if access_error:
             return access_error
 
+        expire_stale_bookings()
         active_trip = Trip.objects.filter(user=request.user, status=Trip.Status.ACTIVE).first()
         history = Trip.objects.filter(user=request.user, status=Trip.Status.COMPLETED)[:10]
         return Response(
@@ -187,6 +198,7 @@ class AdminCarsAPIView(APIView):
     permission_classes = [IsAdminRole]
 
     def get(self, request):
+        expire_stale_bookings()
         return Response(CarSerializer(Car.objects.all(), many=True).data)
 
     def post(self, request):

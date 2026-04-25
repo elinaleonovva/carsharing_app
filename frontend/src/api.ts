@@ -1,5 +1,6 @@
 export type VerificationStatus = "not_requested" | "pending" | "approved" | "rejected";
 export type UserRole = "user" | "admin";
+export type CarStatus = "available" | "booked" | "in_trip" | "service" | "inactive";
 
 export type User = {
   id: number;
@@ -19,8 +20,6 @@ export type User = {
   full_name?: string;
 };
 
-export type CarStatus = "available" | "booked" | "in_trip" | "service" | "inactive";
-
 export type Car = {
   id: number;
   brand: string;
@@ -35,7 +34,7 @@ export type Car = {
 export type Booking = {
   id: number;
   car: Car;
-  status: string;
+  status: "active" | "cancelled" | "completed";
   created_at: string;
   closed_at: string | null;
 };
@@ -98,7 +97,10 @@ type RequestOptions = {
 };
 
 export class ApiError extends Error {
-  constructor(public details: unknown, message = "Ошибка запроса") {
+  constructor(
+    public details: unknown,
+    message = "Ошибка запроса",
+  ) {
     super(message);
   }
 }
@@ -181,8 +183,7 @@ export const api = {
       token,
       body: { amount },
     }),
-  adminApplications: (token: string) =>
-    request<User[]>("/admin/applications/", { token }),
+  adminApplications: (token: string) => request<User[]>("/admin/applications/", { token }),
   adminUserAction: (token: string, userId: number, action: string) =>
     request<User>(`/admin/users/${userId}/action/`, {
       method: "POST",
@@ -209,8 +210,7 @@ export const api = {
       token,
       body,
     }),
-  adminCoefficients: (token: string) =>
-    request<TimeCoefficient[]>("/admin/coefficients/", { token }),
+  adminCoefficients: (token: string) => request<TimeCoefficient[]>("/admin/coefficients/", { token }),
   adminCreateCoefficient: (token: string, body: unknown) =>
     request<TimeCoefficient>("/admin/coefficients/", {
       method: "POST",
