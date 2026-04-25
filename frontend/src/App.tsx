@@ -201,6 +201,10 @@ function getCoordinatesLabel(coords: Coordinates | null): string {
   return `${coords[0].toFixed(6)}, ${coords[1].toFixed(6)}`;
 }
 
+function toApiCoordinate(value: number): string {
+  return value.toFixed(6);
+}
+
 function getBookingSecondsLeft(booking: Booking | null, now: number): number | null {
   if (!booking) {
     return null;
@@ -695,7 +699,7 @@ function UserDashboard({ token, user, onLogout }: { token: string; user: User; o
 
     setMessage("");
     void api
-      .startTrip(token, selectedCar.id, String(userLocation[0]), String(userLocation[1]))
+      .startTrip(token, selectedCar.id, toApiCoordinate(userLocation[0]), toApiCoordinate(userLocation[1]))
       .then(async () => {
         setSelectedCarId(null);
         setDestinationLocation(null);
@@ -714,7 +718,7 @@ function UserDashboard({ token, user, onLogout }: { token: string; user: User; o
     setDestinationLocation(coords);
     setDestinationRouteSummary({ distanceKm: null, durationMinutes: null });
     void api
-      .setTripDestination(token, activeTrip.id, String(coords[0]), String(coords[1]))
+      .setTripDestination(token, activeTrip.id, toApiCoordinate(coords[0]), toApiCoordinate(coords[1]))
       .then((trip) => {
         setActiveTrip(trip);
         setMessage("Точка назначения выбрана, маршрут построится автоматически.");
@@ -734,7 +738,7 @@ function UserDashboard({ token, user, onLogout }: { token: string; user: User; o
     }
 
     void runAction(
-      () => api.finishTrip(token, activeTrip.id, String(destinationLocation[0]), String(destinationLocation[1])),
+      () => api.finishTrip(token, activeTrip.id, toApiCoordinate(destinationLocation[0]), toApiCoordinate(destinationLocation[1])),
       "Поездка завершена.",
     );
   };
