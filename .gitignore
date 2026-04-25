@@ -32,5 +32,6 @@ Thumbs.db
 
 data/
 logs/
+backend/static/
 
 /backend/venv/

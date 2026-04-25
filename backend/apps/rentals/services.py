@@ -1,0 +1,156 @@
+from decimal import Decimal
+
+from django.db import transaction
+from django.utils import timezone
+from rest_framework import serializers
+
+from .models import Booking, Car, Tariff, TimeCoefficient, Trip, WalletTransaction
+
+
+def get_tariff() -> Tariff:
+    tariff, _ = Tariff.objects.get_or_create(
+        pk=1,
+        defaults={
+            "name": "Базовый",
+            "price_per_minute": Decimal("8.00"),
+            "min_start_balance": Decimal("100.00"),
+        },
+    )
+    return tariff
+
+
+def get_current_coefficient() -> Decimal:
+    current_time = timezone.localtime().time()
+
+    for coefficient in TimeCoefficient.objects.all():
+        if coefficient.contains(current_time):
+            return coefficient.coefficient
+
+    return Decimal("1.00")
+
+
+def ensure_user_can_use_service(user) -> None:
+    if not user.can_use_service:
+        raise serializers.ValidationError("Доступ к сервису еще не открыт администратором")
+
+
+@transaction.atomic
+def create_booking(user, car: Car) -> Booking:
+    ensure_user_can_use_service(user)
+
+    if Booking.objects.filter(user=user, status=Booking.Status.ACTIVE).exists():
+        raise serializers.ValidationError("У вас уже есть активное бронирование")
+    if Trip.objects.filter(user=user, status=Trip.Status.ACTIVE).exists():
+        raise serializers.ValidationError("У вас уже есть активная поездка")
+    if car.status != Car.Status.AVAILABLE:
+        raise serializers.ValidationError("Автомобиль сейчас недоступен")
+
+    car.status = Car.Status.BOOKED
+    car.save(update_fields=["status"])
+    return Booking.objects.create(user=user, car=car)
+
+
+@transaction.atomic
+def cancel_booking(booking: Booking) -> Booking:
+    if booking.status != Booking.Status.ACTIVE:
+        raise serializers.ValidationError("Бронирование уже неактивно")
+
+    booking.status = Booking.Status.CANCELLED
+    booking.closed_at = timezone.now()
+    booking.save(update_fields=["status", "closed_at"])
+
+    if booking.car.status == Car.Status.BOOKED:
+        booking.car.status = Car.Status.AVAILABLE
+        booking.car.save(update_fields=["status"])
+
+    return booking
+
+
+@transaction.atomic
+def start_trip(user, car: Car, latitude, longitude) -> Trip:
+    ensure_user_can_use_service(user)
+
+    if Trip.objects.filter(user=user, status=Trip.Status.ACTIVE).exists():
+        raise serializers.ValidationError("У вас уже есть активная поездка")
+
+    tariff = get_tariff()
+    if user.balance < tariff.min_start_balance:
+        raise serializers.ValidationError("Недостаточно средств для начала поездки")
+
+    booking = Booking.objects.filter(user=user, car=car, status=Booking.Status.ACTIVE).first()
+    if car.status == Car.Status.BOOKED and booking is None:
+        raise serializers.ValidationError("Автомобиль забронирован другим пользователем")
+    if car.status not in [Car.Status.AVAILABLE, Car.Status.BOOKED]:
+        raise serializers.ValidationError("Автомобиль сейчас недоступен")
+
+    if booking is not None:
+        booking.status = Booking.Status.COMPLETED
+        booking.closed_at = timezone.now()
+        booking.save(update_fields=["status", "closed_at"])
+
+    car.status = Car.Status.IN_TRIP
+    car.save(update_fields=["status"])
+
+    return Trip.objects.create(
+        user=user,
+        car=car,
+        booking=booking,
+        start_latitude=latitude,
+        start_longitude=longitude,
+        price_per_minute=tariff.price_per_minute,
+        coefficient=get_current_coefficient(),
+    )
+
+
+@transaction.atomic
+def finish_trip(trip: Trip, latitude, longitude) -> Trip:
+    if trip.status != Trip.Status.ACTIVE:
+        raise serializers.ValidationError("Поездка уже завершена")
+
+    finished_at = timezone.now()
+    total_price = trip.calculate_price(finished_at)
+
+    if trip.user.balance < total_price:
+        raise serializers.ValidationError("Недостаточно средств для завершения поездки")
+
+    seconds = max(60, int((finished_at - trip.started_at).total_seconds()))
+    trip.status = Trip.Status.COMPLETED
+    trip.finished_at = finished_at
+    trip.end_latitude = latitude
+    trip.end_longitude = longitude
+    trip.total_minutes = (seconds + 59) // 60
+    trip.total_price = total_price
+    trip.save()
+
+    trip.user.balance -= total_price
+    trip.user.save(update_fields=["balance"])
+
+    trip.car.status = Car.Status.AVAILABLE
+    trip.car.latitude = latitude
+    trip.car.longitude = longitude
+    trip.car.save(update_fields=["status", "latitude", "longitude"])
+
+    WalletTransaction.objects.create(
+        user=trip.user,
+        transaction_type=WalletTransaction.Type.TRIP_PAYMENT,
+        amount=-total_price,
+        description=f"Поездка на {trip.car}",
+    )
+
+    return trip
+
+
+@transaction.atomic
+def top_up_wallet(user, amount: Decimal) -> WalletTransaction:
+    if amount <= 0:
+        raise serializers.ValidationError("Сумма пополнения должна быть больше нуля")
+
+    user.balance += amount
+    user.save(update_fields=["balance"])
+
+    return WalletTransaction.objects.create(
+        user=user,
+        transaction_type=WalletTransaction.Type.TOP_UP,
+        amount=amount,
+        description="Пополнение кошелька",
+    )

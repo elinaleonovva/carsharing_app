@@ -1,9 +1,4 @@
-export type VerificationStatus =
-  | "not_requested"
-  | "pending"
-  | "approved"
-  | "rejected";
-
+export type VerificationStatus = "not_requested" | "pending" | "approved" | "rejected";
 export type UserRole = "user" | "admin";
 
 export type User = {
@@ -21,6 +16,72 @@ export type User = {
   is_blocked: boolean;
   is_verified: boolean;
   can_use_service: boolean;
+  full_name?: string;
+};
+
+export type CarStatus = "available" | "booked" | "in_trip" | "service" | "inactive";
+
+export type Car = {
+  id: number;
+  brand: string;
+  model: string;
+  license_plate: string;
+  status: CarStatus;
+  status_label: string;
+  latitude: string;
+  longitude: string;
+};
+
+export type Booking = {
+  id: number;
+  car: Car;
+  status: string;
+  created_at: string;
+  closed_at: string | null;
+};
+
+export type Trip = {
+  id: number;
+  car: Car;
+  status: "active" | "completed";
+  started_at: string;
+  finished_at: string | null;
+  start_latitude: string;
+  start_longitude: string;
+  end_latitude: string | null;
+  end_longitude: string | null;
+  price_per_minute: string;
+  coefficient: string;
+  total_minutes: number;
+  total_price: string;
+};
+
+export type WalletTransaction = {
+  id: number;
+  transaction_type: string;
+  amount: string;
+  description: string;
+  created_at: string;
+};
+
+export type Wallet = {
+  balance: string;
+  transactions: WalletTransaction[];
+};
+
+export type Tariff = {
+  id: number;
+  name: string;
+  price_per_minute: string;
+  min_start_balance: string;
+};
+
+export type TimeCoefficient = {
+  id: number;
+  name: string;
+  start_time: string;
+  end_time: string;
+  coefficient: string;
 };
 
 export type AuthResponse = {
@@ -85,19 +146,75 @@ export const api = {
       method: "POST",
       token,
     }),
-  me: (token: string) =>
-    request<User>("/auth/me/", {
+  me: (token: string) => request<User>("/auth/me/", { token }),
+  cars: (token: string) => request<Car[]>("/cars/", { token }),
+  booking: (token: string) => request<Booking | null>("/bookings/", { token }),
+  createBooking: (token: string, carId: number) =>
+    request<Booking>("/bookings/", {
+      method: "POST",
+      token,
+      body: { car_id: carId },
+    }),
+  cancelBooking: (token: string, bookingId: number) =>
+    request<Booking>(`/bookings/${bookingId}/cancel/`, {
+      method: "POST",
       token,
     }),
-  updateMe: (token: string, body: unknown) =>
-    request<User>("/auth/me/", {
+  trips: (token: string) =>
+    request<{ active: Trip | null; history: Trip[] }>("/trips/", { token }),
+  startTrip: (token: string, carId: number, latitude: string, longitude: string) =>
+    request<Trip>("/trips/start/", {
+      method: "POST",
+      token,
+      body: { car_id: carId, latitude, longitude },
+    }),
+  finishTrip: (token: string, tripId: number, latitude: string, longitude: string) =>
+    request<Trip>(`/trips/${tripId}/finish/`, {
+      method: "POST",
+      token,
+      body: { latitude, longitude },
+    }),
+  wallet: (token: string) => request<Wallet>("/wallet/", { token }),
+  topUp: (token: string, amount: string) =>
+    request<WalletTransaction>("/wallet/top-up/", {
+      method: "POST",
+      token,
+      body: { amount },
+    }),
+  adminApplications: (token: string) =>
+    request<User[]>("/admin/applications/", { token }),
+  adminUserAction: (token: string, userId: number, action: string) =>
+    request<User>(`/admin/users/${userId}/action/`, {
+      method: "POST",
+      token,
+      body: { action },
+    }),
+  adminCars: (token: string) => request<Car[]>("/admin/cars/", { token }),
+  adminCreateCar: (token: string, body: unknown) =>
+    request<Car>("/admin/cars/", {
+      method: "POST",
+      token,
+      body,
+    }),
+  adminUpdateCar: (token: string, carId: number, body: unknown) =>
+    request<Car>(`/admin/cars/${carId}/`, {
       method: "PATCH",
       token,
       body,
     }),
-  requestVerification: (token: string) =>
-    request<{ status: VerificationStatus; user: User }>("/auth/verification-request/", {
+  adminTariff: (token: string) => request<Tariff>("/admin/tariff/", { token }),
+  adminUpdateTariff: (token: string, body: unknown) =>
+    request<Tariff>("/admin/tariff/", {
+      method: "PATCH",
+      token,
+      body,
+    }),
+  adminCoefficients: (token: string) =>
+    request<TimeCoefficient[]>("/admin/coefficients/", { token }),
+  adminCreateCoefficient: (token: string, body: unknown) =>
+    request<TimeCoefficient>("/admin/coefficients/", {
       method: "POST",
       token,
+      body,
     }),
 };
