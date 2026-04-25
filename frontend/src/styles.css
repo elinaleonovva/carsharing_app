@@ -500,6 +500,32 @@ button:disabled {
   backdrop-filter: blur(14px);
 }
 
+.map-popup-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid rgba(20, 44, 39, 0.12);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--text);
+  font-size: 20px;
+  font-weight: 800;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.map-popup-close:hover {
+  background: var(--surface);
+}
+
+.map-popup h3 {
+  padding-right: 36px;
+}
+
 .admin-popup {
   width: min(340px, calc(100% - 48px));
 }

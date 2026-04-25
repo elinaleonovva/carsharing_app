@@ -714,6 +714,14 @@ function UserDashboard({ token, user, onLogout }: { token: string; user: User; o
 
               {selectedCar && (
                 <aside className="map-popup">
+                  <button
+                    className="map-popup-close"
+                    type="button"
+                    aria-label="Закрыть карточку машины"
+                    onClick={() => setSelectedCarId(null)}
+                  >
+                    ×
+                  </button>
                   <span className={`status-pill ${getStatusTone(selectedCar.status)}`}>
                     {selectedCar.status_label}
                   </span>
@@ -722,12 +730,6 @@ function UserDashboard({ token, user, onLogout }: { token: string; user: User; o
                   </h3>
                   <p className="popup-lead">Госномер: {selectedCar.license_plate}</p>
                   <div className="detail-list">
-                    <div>
-                      <span>Координаты</span>
-                      <strong>
-                        {Number(selectedCar.latitude).toFixed(6)}, {Number(selectedCar.longitude).toFixed(6)}
-                      </strong>
-                    </div>
                     <div>
                       <span>Маршрут</span>
                       <strong>
@@ -1364,8 +1366,7 @@ function FleetMap({
           balloonContentHeader: `${car.brand} ${car.model}`,
           balloonContentBody: `
             <strong>${car.license_plate}</strong><br/>
-            Статус: ${car.status_label}<br/>
-            Координаты: ${Number(car.latitude).toFixed(6)}, ${Number(car.longitude).toFixed(6)}
+            Статус: ${car.status_label}
           `,
         },
         {
