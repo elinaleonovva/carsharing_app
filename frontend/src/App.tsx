@@ -242,7 +242,7 @@ function getCarPreset(car: Car, selectedCarId: number | null): string {
 
   switch (car.status) {
     case "available":
-      return "islands#darkGreenCircleDotIcon";
+      return "islands#greenCircleDotIcon";
     case "booked":
       return "islands#yellowCircleDotIcon";
     case "in_trip":
@@ -544,7 +544,6 @@ function UserDashboard({ token, user, onLogout }: { token: string; user: User; o
   const activeTripSeconds = activeTrip
     ? Math.max(0, Math.floor((now - new Date(activeTrip.started_at).getTime()) / 1000))
     : 0;
-  const hasMapKey = Boolean(getYandexMapsApiKey());
 
   const loadData = async (showLoader = false) => {
     if (showLoader) {
@@ -569,15 +568,7 @@ function UserDashboard({ token, user, onLogout }: { token: string; user: User; o
           return currentSelectedCarId;
         }
 
-        if (bookingData?.car.id) {
-          return bookingData.car.id;
-        }
-
-        if (tripsData.active?.car.id) {
-          return tripsData.active.car.id;
-        }
-
-        return carsData[0]?.id ?? null;
+        return null;
       });
       setMessage("");
     } catch (error) {
@@ -591,6 +582,14 @@ function UserDashboard({ token, user, onLogout }: { token: string; user: User; o
 
   useEffect(() => {
     void loadData(true);
+  }, [token]);
+
+  useEffect(() => {
+    const dataTimer = window.setInterval(() => {
+      void loadData();
+    }, 30000);
+
+    return () => window.clearInterval(dataTimer);
   }, [token]);
 
   useEffect(() => {
@@ -616,24 +615,6 @@ function UserDashboard({ token, user, onLogout }: { token: string; user: User; o
     }
   };
 
-  const handleUseBrowserLocation = () => {
-    if (!navigator.geolocation) {
-      setMessage("Браузер не поддерживает определение местоположения.");
-      return;
-    }
-
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        setUserLocation([position.coords.latitude, position.coords.longitude]);
-        setMessage("Текущая точка установлена на карте.");
-      },
-      () => {
-        setMessage("Не удалось получить геолокацию. Можно поставить точку вручную на карте.");
-      },
-      { enableHighAccuracy: true, timeout: 10000 },
-    );
-  };
-
   const handleBookSelectedCar = () => {
     if (!selectedCar) {
       setMessage("Сначала выберите машину на карте.");
@@ -653,7 +634,7 @@ function UserDashboard({ token, user, onLogout }: { token: string; user: User; o
     }
 
     if (!userLocation) {
-      setMessage("Сначала поставьте свою точку на карте или используйте геолокацию.");
+      setMessage("Сначала поставьте свою точку на карте.");
       return;
     }
 
@@ -689,7 +670,6 @@ function UserDashboard({ token, user, onLogout }: { token: string; user: User; o
         <div>
           <span className="eyebrow">Пользователь</span>
           <h1>{buildFullName(user)}</h1>
-          <p className="topbar-note">Управление поездками, бронью и кошельком внутри одной SPA.</p>
         </div>
         <button className="ghost-button" type="button" onClick={onLogout}>
           Выйти
@@ -714,26 +694,11 @@ function UserDashboard({ token, user, onLogout }: { token: string; user: User; o
                 <span className="eyebrow">Карта Москвы</span>
                 <h2>Все машины на карте и маршрут до выбранной точки</h2>
               </div>
-              <div className="button-row compact-row">
-                <button className="ghost-button" type="button" onClick={() => void loadData()}>
-                  Обновить парк
-                </button>
-                <button className="secondary-button" type="button" onClick={handleUseBrowserLocation}>
-                  Определить меня
-                </button>
-              </div>
             </div>
             <p className="helper-text">
               Нажмите на карту, чтобы поставить свою точку. Затем выберите машину: маршрут
               построится автоматически, а карточка машины появится прямо поверх карты.
             </p>
-            <div className="meta-row">
-              <span className="badge">Моё местоположение: {getCoordinatesLabel(userLocation)}</span>
-              <span className="badge">Автомобилей в парке: {cars.length}</span>
-              <span className="badge">
-                API Яндекс Карт: {hasMapKey ? "подключен" : "нужен APP_YANDEX_MAPS_API_KEY"}
-              </span>
-            </div>
           </div>
 
           <div className="panel map-panel">
@@ -806,7 +771,7 @@ function UserDashboard({ token, user, onLogout }: { token: string; user: User; o
                   </div>
                   {!userLocation && (
                     <p className="inline-note">
-                      Чтобы начать поездку, поставьте свою точку на карте или используйте геолокацию.
+                      Чтобы начать поездку, поставьте свою точку на карте.
                     </p>
                   )}
                   {bookingBelongsToAnotherCar && (
@@ -1397,14 +1362,22 @@ function FleetMap({
         {
           hintContent: `${car.brand} ${car.model}`,
           balloonContentHeader: `${car.brand} ${car.model}`,
-          balloonContentBody: `${car.license_plate} • ${car.status_label}`,
+          balloonContentBody: `
+            <strong>${car.license_plate}</strong><br/>
+            Статус: ${car.status_label}<br/>
+            Координаты: ${Number(car.latitude).toFixed(6)}, ${Number(car.longitude).toFixed(6)}
+          `,
         },
         {
           preset: getCarPreset(car, selectedCarId),
         },
       );
 
-      placemark.events.add("click", () => carSelectRef.current(car.id));
+      placemark.events.add("click", (event) => {
+        event.stopPropagation?.();
+        carSelectRef.current(car.id);
+        placemark.balloon?.open();
+      });
       map.geoObjects.add(placemark);
     }
 
