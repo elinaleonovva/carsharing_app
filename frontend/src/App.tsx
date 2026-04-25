@@ -785,6 +785,7 @@ function UserDashboard({ token, user, onLogout }: { token: string; user: User; o
 
           <div className="panel map-panel">
             <div className="map-stage">
+              {message && <p className="message map-message">{message}</p>}
               <FleetMap
                 cars={cars}
                 selectedCarId={selectedCarId}
@@ -1084,7 +1085,7 @@ function UserDashboard({ token, user, onLogout }: { token: string; user: User; o
         </section>
       )}
 
-      {message && <p className="message fixed-message">{message}</p>}
+      {tab !== "map" && message && <p className="message fixed-message">{message}</p>}
       {isRefreshing && <p className="loading-banner">Синхронизируем карту, бронь и поездки...</p>}
     </main>
   );

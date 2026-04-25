@@ -239,6 +239,15 @@ button:disabled {
   margin: 0 auto;
 }
 
+.map-message {
+  position: absolute;
+  top: 24px;
+  right: 24px;
+  z-index: 5;
+  width: min(430px, calc(100% - 48px));
+  margin: 0;
+}
+
 .loading-banner {
   width: fit-content;
   margin-left: auto;
@@ -663,6 +672,12 @@ button:disabled {
   .map-popup {
     right: 14px;
     bottom: 14px;
+    width: calc(100% - 28px);
+  }
+
+  .map-message {
+    top: 14px;
+    right: 14px;
     width: calc(100% - 28px);
   }
 }

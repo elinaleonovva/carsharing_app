@@ -115,10 +115,6 @@ def start_trip(user, car: Car, latitude, longitude) -> Trip:
     if Trip.objects.filter(user=user, status=Trip.Status.ACTIVE).exists():
         raise serializers.ValidationError("У вас уже есть активная поездка")
 
-    tariff = get_tariff()
-    if user.balance < tariff.min_start_balance:
-        raise serializers.ValidationError("Недостаточно средств для начала поездки")
-
     other_booking = Booking.objects.filter(user=user, status=Booking.Status.ACTIVE).exclude(car=car).first()
     if other_booking is not None:
         raise serializers.ValidationError("Сначала отмените текущую бронь или начните поездку на забронированной машине")
