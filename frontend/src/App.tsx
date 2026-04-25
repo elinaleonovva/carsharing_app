@@ -1,13 +1,17 @@
 // @ts-nocheck
 import { FormEvent, useEffect, useRef, useState } from "react";
 
-import { ApiError, Booking, Car, Tariff, Trip, User, Wallet, api } from "./api";
+import { ApiError, Booking, Car, Tariff, TimeCoefficient, Trip, User, Wallet, api } from "./api";
 import { getYandexMapsApiKey, loadYandexMaps } from "./yandexMapsLoader";
 
 type Coordinates = [number, number];
 type AuthMode = "login" | "register";
 type UserTab = "map" | "wallet" | "activity";
 type AdminTab = "fleet" | "applications" | "tariff";
+type RouteSummary = {
+  distanceKm: number | null;
+  durationMinutes: number | null;
+};
 
 type AuthForm = {
   email: string;
@@ -27,6 +31,7 @@ type CarForm = {
   status: string;
   latitude: string;
   longitude: string;
+  price_per_minute: string;
 };
 
 type FleetMapProps = {
@@ -36,6 +41,10 @@ type FleetMapProps = {
   userLocation?: Coordinates | null;
   onUserLocationChange?: (coords: Coordinates) => void;
   routeCar?: Car | null;
+  destinationLocation?: Coordinates | null;
+  onDestinationLocationChange?: (coords: Coordinates) => void;
+  routeFrom?: Coordinates | null;
+  onRouteSummaryChange?: (summary: RouteSummary) => void;
 };
 
 const TOKEN_KEY = "carsharing_token";
@@ -69,6 +78,7 @@ const initialCarForm: CarForm = {
   status: "available",
   latitude: "55.751244",
   longitude: "37.618423",
+  price_per_minute: "12.00",
 };
 
 function normalizeMessage(message: string): string {
@@ -217,6 +227,27 @@ function calculateDistanceKm(from: Coordinates | null, to: Coordinates | null): 
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 
   return Number((earthRadiusKm * c).toFixed(1));
+}
+
+function getTripDestination(trip: Trip | null): Coordinates | null {
+  if (!trip?.destination_latitude || !trip.destination_longitude) {
+    return null;
+  }
+
+  return [Number(trip.destination_latitude), Number(trip.destination_longitude)];
+}
+
+function calculateEstimatedTripPrice(
+  trip: Trip | null,
+  durationMinutes: number | null,
+): string | null {
+  if (!trip || !durationMinutes) {
+    return null;
+  }
+
+  const safeMinutes = Math.max(1, Math.ceil(durationMinutes));
+  const total = safeMinutes * Number(trip.price_per_minute) * Number(trip.coefficient);
+  return total.toFixed(2);
 }
 
 function getStatusTone(status: Car["status"]): string {
@@ -530,6 +561,11 @@ function UserDashboard({ token, user, onLogout }: { token: string; user: User; o
   const [history, setHistory] = useState<Trip[]>([]);
   const [selectedCarId, setSelectedCarId] = useState<number | null>(null);
   const [userLocation, setUserLocation] = useState<Coordinates | null>(null);
+  const [destinationLocation, setDestinationLocation] = useState<Coordinates | null>(null);
+  const [destinationRouteSummary, setDestinationRouteSummary] = useState<RouteSummary>({
+    distanceKm: null,
+    durationMinutes: null,
+  });
   const [topUpAmount, setTopUpAmount] = useState("500");
   const [message, setMessage] = useState("");
   const [now, setNow] = useState(Date.now());
@@ -540,6 +576,9 @@ function UserDashboard({ token, user, onLogout }: { token: string; user: User; o
     userLocation,
     selectedCar ? getCarCoords(selectedCar) : null,
   );
+  const hasDebt = Number(wallet?.balance ?? user.balance) < 0;
+  const activeTripStart = activeTrip ? getCarCoords(activeTrip.car) : null;
+  const estimatedTripPrice = calculateEstimatedTripPrice(activeTrip, destinationRouteSummary.durationMinutes);
   const bookingSecondsLeft = getBookingSecondsLeft(booking, now);
   const activeTripSeconds = activeTrip
     ? Math.max(0, Math.floor((now - new Date(activeTrip.started_at).getTime()) / 1000))
@@ -563,7 +602,13 @@ function UserDashboard({ token, user, onLogout }: { token: string; user: User; o
       setBooking(bookingData);
       setActiveTrip(tripsData.active);
       setHistory(tripsData.history);
+      setDestinationLocation(getTripDestination(tripsData.active));
+      setDestinationRouteSummary({ distanceKm: null, durationMinutes: null });
       setSelectedCarId((currentSelectedCarId) => {
+        if (tripsData.active) {
+          return null;
+        }
+
         if (currentSelectedCarId && carsData.some((car) => car.id === currentSelectedCarId)) {
           return currentSelectedCarId;
         }
@@ -616,6 +661,11 @@ function UserDashboard({ token, user, onLogout }: { token: string; user: User; o
   };
 
   const handleBookSelectedCar = () => {
+    if (hasDebt) {
+      setMessage("Сначала погасите задолженность в кошельке.");
+      return;
+    }
+
     if (!selectedCar) {
       setMessage("Сначала выберите машину на карте.");
       return;
@@ -628,6 +678,11 @@ function UserDashboard({ token, user, onLogout }: { token: string; user: User; o
   };
 
   const handleStartTrip = () => {
+    if (hasDebt) {
+      setMessage("Сначала погасите задолженность в кошельке.");
+      return;
+    }
+
     if (!selectedCar) {
       setMessage("Сначала выберите машину на карте.");
       return;
@@ -638,10 +693,33 @@ function UserDashboard({ token, user, onLogout }: { token: string; user: User; o
       return;
     }
 
-    void runAction(
-      () => api.startTrip(token, selectedCar.id, String(userLocation[0]), String(userLocation[1])),
-      "Поездка началась.",
-    );
+    setMessage("");
+    void api
+      .startTrip(token, selectedCar.id, String(userLocation[0]), String(userLocation[1]))
+      .then(async () => {
+        setSelectedCarId(null);
+        setDestinationLocation(null);
+        setDestinationRouteSummary({ distanceKm: null, durationMinutes: null });
+        await loadData();
+        setMessage("Поездка началась. Теперь поставьте точку назначения на карте.");
+      })
+      .catch((error) => setMessage(getErrorMessage(error)));
+  };
+
+  const handleDestinationChange = (coords: Coordinates) => {
+    if (!activeTrip) {
+      return;
+    }
+
+    setDestinationLocation(coords);
+    setDestinationRouteSummary({ distanceKm: null, durationMinutes: null });
+    void api
+      .setTripDestination(token, activeTrip.id, String(coords[0]), String(coords[1]))
+      .then((trip) => {
+        setActiveTrip(trip);
+        setMessage("Точка назначения выбрана, маршрут построится автоматически.");
+      })
+      .catch((error) => setMessage(getErrorMessage(error)));
   };
 
   const handleFinishTrip = () => {
@@ -650,13 +728,13 @@ function UserDashboard({ token, user, onLogout }: { token: string; user: User; o
       return;
     }
 
-    if (!userLocation) {
-      setMessage("Перед завершением укажите текущую точку на карте.");
+    if (!destinationLocation) {
+      setMessage("Перед завершением поставьте точку назначения на карте.");
       return;
     }
 
     void runAction(
-      () => api.finishTrip(token, activeTrip.id, String(userLocation[0]), String(userLocation[1])),
+      () => api.finishTrip(token, activeTrip.id, String(destinationLocation[0]), String(destinationLocation[1])),
       "Поездка завершена.",
     );
   };
@@ -707,12 +785,71 @@ function UserDashboard({ token, user, onLogout }: { token: string; user: User; o
                 cars={cars}
                 selectedCarId={selectedCarId}
                 onCarSelect={setSelectedCarId}
-                userLocation={userLocation}
-                onUserLocationChange={setUserLocation}
-                routeCar={selectedCar}
+                userLocation={activeTrip ? null : userLocation}
+                onUserLocationChange={activeTrip ? undefined : setUserLocation}
+                routeCar={activeTrip ? null : selectedCar}
+                destinationLocation={destinationLocation}
+                onDestinationLocationChange={activeTrip ? handleDestinationChange : undefined}
+                routeFrom={activeTripStart}
+                onRouteSummaryChange={setDestinationRouteSummary}
               />
 
-              {selectedCar && (
+              {activeTrip && (
+                <aside className="map-popup trip-popup">
+                  <span className="status-pill info">Поездка идет</span>
+                  <h3>
+                    {activeTrip.car.brand} {activeTrip.car.model}
+                  </h3>
+                  <p className="popup-lead">
+                    Поставьте на карте точку назначения: маршрут и примерная стоимость появятся здесь.
+                  </p>
+                  <div className="detail-list">
+                    <div>
+                      <span>Цена машины</span>
+                      <strong>{formatMoney(activeTrip.price_per_minute)} / мин</strong>
+                    </div>
+                    <div>
+                      <span>Коэффициент</span>
+                      <strong>x{activeTrip.coefficient}</strong>
+                    </div>
+                    <div>
+                      <span>Маршрут</span>
+                      <strong>
+                        {destinationRouteSummary.distanceKm === null
+                          ? destinationLocation
+                            ? "Строится..."
+                            : "Выберите точку"
+                          : `${destinationRouteSummary.distanceKm} км`}
+                      </strong>
+                    </div>
+                    <div>
+                      <span>В пути</span>
+                      <strong>
+                        {destinationRouteSummary.durationMinutes === null
+                          ? "Оценка появится после маршрута"
+                          : `Около ${destinationRouteSummary.durationMinutes} мин`}
+                      </strong>
+                    </div>
+                    <div>
+                      <span>Примерно</span>
+                      <strong>{estimatedTripPrice ? formatMoney(estimatedTripPrice) : "После выбора точки"}</strong>
+                    </div>
+                  </div>
+                  <button
+                    className="primary-button"
+                    type="button"
+                    disabled={!destinationLocation}
+                    onClick={handleFinishTrip}
+                  >
+                    Завершить поездку
+                  </button>
+                  <p className="inline-note">
+                    Итоговая сумма зависит от фактического времени поездки и будет списана после завершения.
+                  </p>
+                </aside>
+              )}
+
+              {!activeTrip && selectedCar && (
                 <aside className="map-popup">
                   <button
                     className="map-popup-close"
@@ -748,12 +885,16 @@ function UserDashboard({ token, user, onLogout }: { token: string; user: User; o
                           : "Не активна"}
                       </strong>
                     </div>
+                    <div>
+                      <span>Цена</span>
+                      <strong>{formatMoney(selectedCar.price_per_minute)} / мин</strong>
+                    </div>
                   </div>
                   <div className="button-row">
                     <button
                       className="secondary-button"
                       type="button"
-                      disabled={Boolean(activeTrip || booking)}
+                      disabled={hasDebt || Boolean(activeTrip || booking)}
                       onClick={handleBookSelectedCar}
                     >
                       {bookingBelongsToSelectedCar
@@ -765,7 +906,7 @@ function UserDashboard({ token, user, onLogout }: { token: string; user: User; o
                     <button
                       className="primary-button"
                       type="button"
-                      disabled={!userLocation || Boolean(activeTrip) || bookingBelongsToAnotherCar}
+                      disabled={hasDebt || !userLocation || Boolean(activeTrip) || bookingBelongsToAnotherCar}
                       onClick={handleStartTrip}
                     >
                       {activeTrip ? "Поездка уже идет" : "Начать поездку"}
@@ -774,6 +915,11 @@ function UserDashboard({ token, user, onLogout }: { token: string; user: User; o
                   {!userLocation && (
                     <p className="inline-note">
                       Чтобы начать поездку, поставьте свою точку на карте.
+                    </p>
+                  )}
+                  {hasDebt && (
+                    <p className="inline-note">
+                      Есть задолженность. Пополните кошелек, чтобы снова бронировать и начинать поездки.
                     </p>
                   )}
                   {bookingBelongsToAnotherCar && (
@@ -795,8 +941,14 @@ function UserDashboard({ token, user, onLogout }: { token: string; user: User; o
             <h2>Кошелек</h2>
             <p className="big-number">{formatMoney(wallet?.balance ?? user.balance)}</p>
             <p className="helper-text">
-              Баланс используется для старта и завершения поездок. Пополнение сразу отражается в истории операций.
+              Баланс используется для старта поездок и оплаты итоговой стоимости. Если баланс ушел в минус, это долг:
+              новые брони и поездки будут недоступны до пополнения.
             </p>
+            {hasDebt && (
+              <p className="inline-note">
+                Сейчас есть задолженность {formatMoney(Math.abs(Number(wallet?.balance ?? user.balance)))}.
+              </p>
+            )}
             <div className="inline-form">
               <input
                 value={topUpAmount}
@@ -886,7 +1038,7 @@ function UserDashboard({ token, user, onLogout }: { token: string; user: User; o
                 <p className="panel-title">
                   {activeTrip.car.brand} {activeTrip.car.model}
                 </p>
-                <p className="helper-text">Для завершения поездки можно заново поставить текущую точку на карте.</p>
+                <p className="helper-text">На карте поставьте точку назначения: маршрут и примерная стоимость появятся автоматически.</p>
                 <p className="big-number">{formatDuration(activeTripSeconds)}</p>
                 <div className="button-row">
                   <button className="ghost-button" type="button" onClick={() => setTab("map")}>
@@ -939,6 +1091,7 @@ function AdminDashboard({ token, user, onLogout }: { token: string; user: User; 
   const [applications, setApplications] = useState<User[]>([]);
   const [cars, setCars] = useState<Car[]>([]);
   const [tariff, setTariff] = useState<Tariff | null>(null);
+  const [coefficients, setCoefficients] = useState<TimeCoefficient[]>([]);
   const [carForm, setCarForm] = useState<CarForm>(initialCarForm);
   const [selectedCarId, setSelectedCarId] = useState<number | null>(null);
   const [message, setMessage] = useState("");
@@ -948,15 +1101,17 @@ function AdminDashboard({ token, user, onLogout }: { token: string; user: User; 
 
   const loadAdminData = async () => {
     try {
-      const [usersData, carsData, tariffData] = await Promise.all([
+      const [usersData, carsData, tariffData, coefficientsData] = await Promise.all([
         api.adminApplications(token),
         api.adminCars(token),
         api.adminTariff(token),
+        api.adminCoefficients(token),
       ]);
 
       setApplications(usersData);
       setCars(carsData);
       setTariff(tariffData);
+      setCoefficients(coefficientsData);
       setSelectedCarId((currentSelectedCarId) => {
         if (currentSelectedCarId && carsData.some((car) => car.id === currentSelectedCarId)) {
           return currentSelectedCarId;
@@ -1043,6 +1198,7 @@ function AdminDashboard({ token, user, onLogout }: { token: string; user: User; 
                     {selectedCar.brand} {selectedCar.model}
                   </h3>
                   <p className="popup-lead">Госномер: {selectedCar.license_plate}</p>
+                  <p className="popup-lead">Цена: {formatMoney(selectedCar.price_per_minute)} / мин</p>
                   <label>
                     Статус автомобиля
                     <select
@@ -1112,6 +1268,12 @@ function AdminDashboard({ token, user, onLogout }: { token: string; user: User; 
                   required
                 />
               </div>
+              <input
+                placeholder="Цена за минуту"
+                value={carForm.price_per_minute}
+                onChange={(event) => setCarForm((form) => ({ ...form, price_per_minute: event.target.value }))}
+                required
+              />
               <button className="primary-button" type="submit">
                 Добавить
               </button>
@@ -1189,15 +1351,6 @@ function AdminDashboard({ token, user, onLogout }: { token: string; user: User; 
             <span className="eyebrow">Тариф</span>
             <h2>Настройки поездок</h2>
             <label>
-              Цена за минуту
-              <input
-                value={tariff?.price_per_minute ?? ""}
-                onChange={(event) =>
-                  setTariff((value) => (value ? { ...value, price_per_minute: event.target.value } : value))
-                }
-              />
-            </label>
-            <label>
               Минимальный баланс
               <input
                 value={tariff?.min_start_balance ?? ""}
@@ -1215,7 +1368,6 @@ function AdminDashboard({ token, user, onLogout }: { token: string; user: User; 
                 void runAction(
                   () =>
                     api.adminUpdateTariff(token, {
-                      price_per_minute: tariff.price_per_minute,
                       min_start_balance: tariff.min_start_balance,
                     }),
                   "Тариф сохранен.",
@@ -1228,11 +1380,24 @@ function AdminDashboard({ token, user, onLogout }: { token: string; user: User; 
 
           <div className="panel">
             <span className="eyebrow">Контекст</span>
-            <h2>Как это влияет на пользователя</h2>
+            <h2>Коэффициенты времени</h2>
             <p className="helper-text">
-              Новое значение тарифа применяется к следующим поездкам. Карта, брони и история поездок на клиенте
-              обновляются через API без перезагрузки всей SPA.
+              Цена поездки считается как минуты поездки, умноженные на цену выбранной машины и коэффициент времени
+              старта. Коэффициент фиксируется при начале поездки.
             </p>
+            <div className="simple-list">
+              {coefficients.map((coefficient) => (
+                <div className="list-card" key={coefficient.id}>
+                  <div>
+                    <strong>{coefficient.name}</strong>
+                    <span>
+                      {coefficient.start_time.slice(0, 5)} - {coefficient.end_time.slice(0, 5)}
+                    </span>
+                  </div>
+                  <strong>x{coefficient.coefficient}</strong>
+                </div>
+              ))}
+            </div>
           </div>
         </section>
       )}
@@ -1274,11 +1439,17 @@ function FleetMap({
   userLocation = null,
   onUserLocationChange,
   routeCar = null,
+  destinationLocation = null,
+  onDestinationLocationChange,
+  routeFrom = null,
+  onRouteSummaryChange,
 }: FleetMapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<YMapsMapInstance | null>(null);
   const ymapsRef = useRef<YMapsApi | null>(null);
   const locationChangeRef = useRef(onUserLocationChange);
+  const destinationChangeRef = useRef(onDestinationLocationChange);
+  const routeSummaryChangeRef = useRef(onRouteSummaryChange);
   const carSelectRef = useRef(onCarSelect);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
@@ -1286,6 +1457,14 @@ function FleetMap({
   useEffect(() => {
     locationChangeRef.current = onUserLocationChange;
   }, [onUserLocationChange]);
+
+  useEffect(() => {
+    destinationChangeRef.current = onDestinationLocationChange;
+  }, [onDestinationLocationChange]);
+
+  useEffect(() => {
+    routeSummaryChangeRef.current = onRouteSummaryChange;
+  }, [onRouteSummaryChange]);
 
   useEffect(() => {
     carSelectRef.current = onCarSelect;
@@ -1320,11 +1499,17 @@ function FleetMap({
 
         map.events.add("click", (event) => {
           const coords = event.get("coords");
-          if (!Array.isArray(coords) || !locationChangeRef.current) {
+          if (!Array.isArray(coords)) {
             return;
           }
 
-          locationChangeRef.current([Number(coords[0]), Number(coords[1])]);
+          const normalizedCoords: Coordinates = [Number(coords[0]), Number(coords[1])];
+          if (destinationChangeRef.current) {
+            destinationChangeRef.current(normalizedCoords);
+            return;
+          }
+
+          locationChangeRef.current?.(normalizedCoords);
         });
 
         mapRef.current = map;
@@ -1416,7 +1601,56 @@ function FleetMap({
 
       map.geoObjects.add(route);
     }
-  }, [cars, routeCar, selectedCarId, userLocation]);
+
+    if (destinationLocation) {
+      const destinationPlacemark = new ymaps.Placemark(
+        destinationLocation,
+        {
+          hintContent: "Точка назначения",
+          balloonContentHeader: "Точка назначения",
+          balloonContentBody: "Сюда строится маршрут текущей поездки.",
+        },
+        {
+          preset: "islands#redFlagIcon",
+        },
+      );
+      map.geoObjects.add(destinationPlacemark);
+    }
+
+    if (routeFrom && destinationLocation) {
+      const destinationRoute = new ymaps.multiRouter.MultiRoute(
+        {
+          referencePoints: [routeFrom, destinationLocation],
+          params: {
+            routingMode: "auto",
+          },
+        },
+        {
+          boundsAutoApply: true,
+          wayPointVisible: false,
+          viaPointVisible: false,
+          routeActiveStrokeWidth: 5,
+          routeActiveStrokeColor: "#d06a25",
+        },
+      );
+
+      destinationRoute.model.events.add("requestsuccess", () => {
+        const activeRoute = destinationRoute.getActiveRoute();
+        const distanceMeters = activeRoute?.properties.get("distance")?.value ?? null;
+        const durationSeconds = activeRoute?.properties.get("duration")?.value ?? null;
+        routeSummaryChangeRef.current?.({
+          distanceKm: distanceMeters === null ? null : Number((distanceMeters / 1000).toFixed(1)),
+          durationMinutes: durationSeconds === null ? null : Math.max(1, Math.ceil(durationSeconds / 60)),
+        });
+      });
+
+      destinationRoute.model.events.add("requestfail", () => {
+        routeSummaryChangeRef.current?.({ distanceKm: null, durationMinutes: null });
+      });
+
+      map.geoObjects.add(destinationRoute);
+    }
+  }, [cars, destinationLocation, routeCar, routeFrom, selectedCarId, userLocation]);
 
   if (!getYandexMapsApiKey()) {
     return (

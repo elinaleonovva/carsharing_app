@@ -20,6 +20,7 @@ class Car(models.Model):
     status = models.CharField(max_length=24, choices=Status.choices, default=Status.AVAILABLE)
     latitude = models.DecimalField(max_digits=9, decimal_places=6)
     longitude = models.DecimalField(max_digits=9, decimal_places=6)
+    price_per_minute = models.DecimalField(max_digits=8, decimal_places=2, default=Decimal("10.00"))
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -97,6 +98,8 @@ class Trip(models.Model):
     finished_at = models.DateTimeField(null=True, blank=True)
     start_latitude = models.DecimalField(max_digits=9, decimal_places=6)
     start_longitude = models.DecimalField(max_digits=9, decimal_places=6)
+    destination_latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    destination_longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
     end_latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
     end_longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
     price_per_minute = models.DecimalField(max_digits=8, decimal_places=2)

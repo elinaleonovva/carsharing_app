@@ -31,6 +31,7 @@ export type Car = {
   status_label: string;
   latitude: string;
   longitude: string;
+  price_per_minute: string;
 };
 
 export type Booking = {
@@ -49,6 +50,8 @@ export type Trip = {
   finished_at: string | null;
   start_latitude: string;
   start_longitude: string;
+  destination_latitude: string | null;
+  destination_longitude: string | null;
   end_latitude: string | null;
   end_longitude: string | null;
   price_per_minute: string;
@@ -174,6 +177,12 @@ export const api = {
     }),
   finishTrip: (token: string, tripId: number, latitude: string, longitude: string) =>
     request<Trip>(`/trips/${tripId}/finish/`, {
+      method: "POST",
+      token,
+      body: { latitude, longitude },
+    }),
+  setTripDestination: (token: string, tripId: number, latitude: string, longitude: string) =>
+    request<Trip>(`/trips/${tripId}/destination/`, {
       method: "POST",
       token,
       body: { latitude, longitude },

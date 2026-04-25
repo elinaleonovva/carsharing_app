@@ -17,6 +17,7 @@ from .serializers import (
     TimeCoefficientSerializer,
     TopUpSerializer,
     TripSerializer,
+    TripDestinationSerializer,
     WalletTransactionSerializer,
 )
 from .services import (
@@ -25,6 +26,7 @@ from .services import (
     expire_stale_bookings,
     finish_trip,
     get_tariff,
+    set_trip_destination,
     start_trip,
     top_up_wallet,
 )
@@ -129,6 +131,23 @@ class TripFinishAPIView(ServiceAccessMixin, APIView):
         serializer = FinishTripSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         trip = finish_trip(
+            trip,
+            serializer.validated_data["latitude"],
+            serializer.validated_data["longitude"],
+        )
+        return Response(TripSerializer(trip).data)
+
+
+class TripDestinationAPIView(ServiceAccessMixin, APIView):
+    def post(self, request, pk):
+        access_error = self.check_service_access(request)
+        if access_error:
+            return access_error
+
+        trip = Trip.objects.get(pk=pk, user=request.user)
+        serializer = TripDestinationSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        trip = set_trip_destination(
             trip,
             serializer.validated_data["latitude"],
             serializer.validated_data["longitude"],

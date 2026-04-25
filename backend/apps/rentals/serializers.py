@@ -25,6 +25,7 @@ class CarSerializer(serializers.ModelSerializer):
             "status_label",
             "latitude",
             "longitude",
+            "price_per_minute",
         )
 
 
@@ -55,6 +56,8 @@ class TripSerializer(serializers.ModelSerializer):
             "finished_at",
             "start_latitude",
             "start_longitude",
+            "destination_latitude",
+            "destination_longitude",
             "end_latitude",
             "end_longitude",
             "price_per_minute",
@@ -71,6 +74,11 @@ class StartTripSerializer(serializers.Serializer):
 
 
 class FinishTripSerializer(serializers.Serializer):
+    latitude = serializers.DecimalField(max_digits=9, decimal_places=6)
+    longitude = serializers.DecimalField(max_digits=9, decimal_places=6)
+
+
+class TripDestinationSerializer(serializers.Serializer):
     latitude = serializers.DecimalField(max_digits=9, decimal_places=6)
     longitude = serializers.DecimalField(max_digits=9, decimal_places=6)
 

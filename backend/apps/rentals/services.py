@@ -38,6 +38,11 @@ def ensure_user_can_use_service(user) -> None:
         raise serializers.ValidationError("Доступ к сервису еще не открыт администратором")
 
 
+def ensure_user_has_no_debt(user) -> None:
+    if user.balance < 0:
+        raise serializers.ValidationError("Сначала погасите задолженность в кошельке")
+
+
 @transaction.atomic
 def expire_stale_bookings() -> int:
     now = timezone.now()
@@ -70,6 +75,7 @@ def expire_stale_bookings() -> int:
 @transaction.atomic
 def create_booking(user, car: Car) -> Booking:
     ensure_user_can_use_service(user)
+    ensure_user_has_no_debt(user)
     expire_stale_bookings()
 
     if Booking.objects.filter(user=user, status=Booking.Status.ACTIVE).exists():
@@ -103,6 +109,7 @@ def cancel_booking(booking: Booking) -> Booking:
 @transaction.atomic
 def start_trip(user, car: Car, latitude, longitude) -> Trip:
     ensure_user_can_use_service(user)
+    ensure_user_has_no_debt(user)
     expire_stale_bookings()
 
     if Trip.objects.filter(user=user, status=Trip.Status.ACTIVE).exists():
@@ -136,9 +143,20 @@ def start_trip(user, car: Car, latitude, longitude) -> Trip:
         booking=booking,
         start_latitude=latitude,
         start_longitude=longitude,
-        price_per_minute=tariff.price_per_minute,
+        price_per_minute=car.price_per_minute,
         coefficient=get_current_coefficient(),
     )
+
+
+@transaction.atomic
+def set_trip_destination(trip: Trip, latitude, longitude) -> Trip:
+    if trip.status != Trip.Status.ACTIVE:
+        raise serializers.ValidationError("Поездка уже завершена")
+
+    trip.destination_latitude = latitude
+    trip.destination_longitude = longitude
+    trip.save(update_fields=["destination_latitude", "destination_longitude"])
+    return trip
 
 
 @transaction.atomic
@@ -148,9 +166,6 @@ def finish_trip(trip: Trip, latitude, longitude) -> Trip:
 
     finished_at = timezone.now()
     total_price = trip.calculate_price(finished_at)
-
-    if trip.user.balance < total_price:
-        raise serializers.ValidationError("Недостаточно средств для завершения поездки")
 
     seconds = max(60, int((finished_at - trip.started_at).total_seconds()))
     trip.status = Trip.Status.COMPLETED
