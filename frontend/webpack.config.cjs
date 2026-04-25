@@ -47,9 +47,15 @@ module.exports = (_, argv) => {
         template: path.resolve(projectRoot, "index.html"),
       }),
       new webpack.DefinePlugin({
-        "process.env.APP_API_BASE_URL": JSON.stringify(process.env.APP_API_BASE_URL || "/api"),
-        "process.env.APP_YANDEX_MAPS_API_KEY": JSON.stringify(process.env.APP_YANDEX_MAPS_API_KEY || ""),
-        "process.env.APP_YANDEX_MAPS_LANG": JSON.stringify(process.env.APP_YANDEX_MAPS_LANG || "ru_RU"),
+        "process.env.APP_API_BASE_URL": JSON.stringify(
+          process.env.APP_API_BASE_URL || process.env.VITE_API_BASE_URL || "/api",
+        ),
+        "process.env.APP_YANDEX_MAPS_API_KEY": JSON.stringify(
+          process.env.APP_YANDEX_MAPS_API_KEY || process.env.VITE_YANDEX_MAPS_API_KEY || "",
+        ),
+        "process.env.APP_YANDEX_MAPS_LANG": JSON.stringify(
+          process.env.APP_YANDEX_MAPS_LANG || process.env.VITE_YANDEX_MAPS_LANG || "ru_RU",
+        ),
       }),
     ],
     devtool: isProduction ? "source-map" : "eval-cheap-module-source-map",
