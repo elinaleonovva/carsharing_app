@@ -2,7 +2,7 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
 
 import { ApiError, Booking, Car, Tariff, Trip, User, Wallet, api } from "./api";
-import { getYandexMapsApiKey, loadYandexMaps } from "./yandexMaps";
+import { getYandexMapsApiKey, loadYandexMaps } from "./yandexMapsLoader";
 
 type Coordinates = [number, number];
 type AuthMode = "login" | "register";
@@ -731,7 +731,7 @@ function UserDashboard({ token, user, onLogout }: { token: string; user: User; o
               <span className="badge">Моё местоположение: {getCoordinatesLabel(userLocation)}</span>
               <span className="badge">Автомобилей в парке: {cars.length}</span>
               <span className="badge">
-                API Яндекс Карт: {hasMapKey ? "подключен" : "нужен VITE_YANDEX_MAPS_API_KEY"}
+                API Яндекс Карт: {hasMapKey ? "подключен" : "нужен APP_YANDEX_MAPS_API_KEY"}
               </span>
             </div>
           </div>
@@ -1448,7 +1448,7 @@ function FleetMap({
     return (
       <div className="map-fallback">
         <strong>Карта отключена</strong>
-        <p>Добавьте `VITE_YANDEX_MAPS_API_KEY` в `.env`, чтобы подключить реальный API Яндекс Карт.</p>
+        <p>Добавьте `APP_YANDEX_MAPS_API_KEY` в `.env`, чтобы подключить реальный API Яндекс Карт.</p>
       </div>
     );
   }

@@ -1,3 +1,5 @@
+import { appConfig } from "./appConfig";
+
 export type VerificationStatus = "not_requested" | "pending" | "approved" | "rejected";
 export type UserRole = "user" | "admin";
 export type CarStatus = "available" | "booked" | "in_trip" | "service" | "inactive";
@@ -88,7 +90,7 @@ export type AuthResponse = {
   user: User;
 };
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "/api";
+const API_BASE_URL = appConfig.apiBaseUrl;
 
 type RequestOptions = {
   token?: string | null;
