@@ -346,7 +346,6 @@ button:disabled {
 
 .hero-panel {
   display: grid;
-  gap: 14px;
 }
 
 .hero-row {
