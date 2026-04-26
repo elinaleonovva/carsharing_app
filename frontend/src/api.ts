@@ -36,6 +36,7 @@ export type Car = {
 
 export type Booking = {
   id: number;
+  user?: User;
   car: Car;
   status: "active" | "cancelled" | "completed";
   created_at: string;
@@ -44,6 +45,7 @@ export type Booking = {
 
 export type Trip = {
   id: number;
+  user?: User;
   car: Car;
   status: "active" | "completed";
   started_at: string;
@@ -56,8 +58,21 @@ export type Trip = {
   end_longitude: string | null;
   price_per_minute: string;
   coefficient: string;
+  bonus_zone_name: string | null;
+  discount_percent: string;
   total_minutes: number;
   total_price: string;
+};
+
+export type BonusZone = {
+  id: number;
+  name: string;
+  latitude: string;
+  longitude: string;
+  radius_meters: number;
+  discount_percent: string;
+  is_active: boolean;
+  created_at: string;
 };
 
 export type WalletTransaction = {
@@ -155,6 +170,7 @@ export const api = {
     }),
   me: (token: string) => request<User>("/auth/me/", { token }),
   cars: (token: string) => request<Car[]>("/cars/", { token }),
+  bonusZones: (token: string) => request<BonusZone[]>("/bonus-zones/", { token }),
   booking: (token: string) => request<Booking | null>("/bookings/", { token }),
   createBooking: (token: string, carId: number) =>
     request<Booking>("/bookings/", {
@@ -195,6 +211,7 @@ export const api = {
       body: { amount },
     }),
   adminApplications: (token: string) => request<User[]>("/admin/applications/", { token }),
+  adminUsers: (token: string) => request<User[]>("/admin/users/", { token }),
   adminUserAction: (token: string, userId: number, action: string) =>
     request<User>(`/admin/users/${userId}/action/`, {
       method: "POST",
@@ -202,6 +219,8 @@ export const api = {
       body: { action },
     }),
   adminCars: (token: string) => request<Car[]>("/admin/cars/", { token }),
+  adminBookings: (token: string) => request<Booking[]>("/admin/bookings/", { token }),
+  adminTrips: (token: string) => request<Trip[]>("/admin/trips/", { token }),
   adminCreateCar: (token: string, body: unknown) =>
     request<Car>("/admin/cars/", {
       method: "POST",
@@ -225,6 +244,25 @@ export const api = {
   adminCreateCoefficient: (token: string, body: unknown) =>
     request<TimeCoefficient>("/admin/coefficients/", {
       method: "POST",
+      token,
+      body,
+    }),
+  adminUpdateCoefficient: (token: string, coefficientId: number, body: unknown) =>
+    request<TimeCoefficient>(`/admin/coefficients/${coefficientId}/`, {
+      method: "PATCH",
+      token,
+      body,
+    }),
+  adminBonusZones: (token: string) => request<BonusZone[]>("/admin/bonus-zones/", { token }),
+  adminCreateBonusZone: (token: string, body: unknown) =>
+    request<BonusZone>("/admin/bonus-zones/", {
+      method: "POST",
+      token,
+      body,
+    }),
+  adminUpdateBonusZone: (token: string, zoneId: number, body: unknown) =>
+    request<BonusZone>(`/admin/bonus-zones/${zoneId}/`, {
+      method: "PATCH",
       token,
       body,
     }),

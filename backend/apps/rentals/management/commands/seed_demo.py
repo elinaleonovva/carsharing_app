@@ -3,7 +3,7 @@ from decimal import Decimal
 from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand
 
-from apps.rentals.models import Car, Tariff, TimeCoefficient
+from apps.rentals.models import BonusZone, Car, Tariff, TimeCoefficient
 
 
 MOSCOW_CARS = [
@@ -40,6 +40,12 @@ MOSCOW_CARS = [
 ]
 
 LEGACY_DEMO_PLATES = ["A111AA", "B222BB", "C333CC"]
+
+BONUS_ZONES = [
+    ("Скидочная зона у Парка Горького", "55.729800", "37.603700", 650, Decimal("10.00")),
+    ("Скидочная зона у Сокольников", "55.794000", "37.676200", 700, Decimal("10.00")),
+    ("Скидочная зона у Москва-Сити", "55.749500", "37.539600", 600, Decimal("10.00")),
+]
 
 
 class Command(BaseCommand):
@@ -112,6 +118,18 @@ class Command(BaseCommand):
                     "latitude": latitude,
                     "longitude": longitude,
                     "price_per_minute": Decimal(price_per_minute),
+                },
+            )
+
+        for name, latitude, longitude, radius_meters, discount_percent in BONUS_ZONES:
+            BonusZone.objects.update_or_create(
+                name=name,
+                defaults={
+                    "latitude": latitude,
+                    "longitude": longitude,
+                    "radius_meters": radius_meters,
+                    "discount_percent": discount_percent,
+                    "is_active": True,
                 },
             )
 

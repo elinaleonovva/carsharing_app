@@ -608,6 +608,15 @@ button:disabled {
   margin-top: 4px;
 }
 
+.trip-activity-panel {
+  display: grid;
+  gap: 18px;
+}
+
+.trip-activity-panel .button-row {
+  margin-top: 10px;
+}
+
 .detail-list div {
   display: flex;
   align-items: center;

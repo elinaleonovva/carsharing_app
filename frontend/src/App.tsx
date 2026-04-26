@@ -1,13 +1,13 @@
 // @ts-nocheck
 import { FormEvent, useEffect, useRef, useState } from "react";
 
-import { ApiError, Booking, Car, Tariff, TimeCoefficient, Trip, User, Wallet, api } from "./api";
+import { ApiError, Booking, BonusZone, Car, Tariff, TimeCoefficient, Trip, User, Wallet, api } from "./api";
 import { getYandexMapsApiKey, loadYandexMaps } from "./yandexMapsLoader";
 
 type Coordinates = [number, number];
 type AuthMode = "login" | "register";
 type UserTab = "map" | "wallet" | "activity";
-type AdminTab = "fleet" | "applications" | "tariff";
+type AdminTab = "map" | "wallet" | "activity" | "users" | "applications" | "fleet" | "bookings" | "trips" | "tariff" | "zones";
 type RouteSummary = {
   distanceKm: number | null;
   durationMinutes: number | null;
@@ -34,6 +34,15 @@ type CarForm = {
   price_per_minute: string;
 };
 
+type BonusZoneForm = {
+  name: string;
+  latitude: string;
+  longitude: string;
+  radius_meters: string;
+  discount_percent: string;
+  is_active: boolean;
+};
+
 type FleetMapProps = {
   cars: Car[];
   selectedCarId: number | null;
@@ -45,6 +54,8 @@ type FleetMapProps = {
   onDestinationLocationChange?: (coords: Coordinates) => void;
   routeFrom?: Coordinates | null;
   onRouteSummaryChange?: (summary: RouteSummary) => void;
+  bonusZones?: BonusZone[];
+  onBonusZoneCenterChange?: (coords: Coordinates) => void;
 };
 
 const TOKEN_KEY = "carsharing_token";
@@ -98,6 +109,15 @@ const initialCarForm: CarForm = {
   latitude: "55.751244",
   longitude: "37.618423",
   price_per_minute: "12.00",
+};
+
+const initialBonusZoneForm: BonusZoneForm = {
+  name: "",
+  latitude: "55.751244",
+  longitude: "37.618423",
+  radius_meters: "600",
+  discount_percent: "10.00",
+  is_active: true,
 };
 
 function normalizeMessage(message: string): string {
@@ -414,6 +434,7 @@ function App() {
     return <WaitingScreen user={user} onLogout={handleLogout} />;
   }
 
+
   return (
     <main className="app-shell">
       <section className="intro-panel">
@@ -595,6 +616,7 @@ function WaitingScreen({ user, onLogout }: { user: User; onLogout: () => void })
 function UserDashboard({ token, user, onLogout }: { token: string; user: User; onLogout: () => void }) {
   const [tab, setTab] = useState<UserTab>("map");
   const [cars, setCars] = useState<Car[]>([]);
+  const [bonusZones, setBonusZones] = useState<BonusZone[]>([]);
   const [wallet, setWallet] = useState<Wallet | null>(null);
   const [booking, setBooking] = useState<Booking | null>(null);
   const [activeTrip, setActiveTrip] = useState<Trip | null>(null);
@@ -628,14 +650,16 @@ function UserDashboard({ token, user, onLogout }: { token: string; user: User; o
     }
 
     try {
-      const [carsData, walletData, bookingData, tripsData] = await Promise.all([
+      const [carsData, walletData, bookingData, tripsData, bonusZonesData] = await Promise.all([
         api.cars(token),
         api.wallet(token),
         api.booking(token),
         api.trips(token),
+        api.bonusZones(token),
       ]);
 
       setCars(carsData);
+      setBonusZones(bonusZonesData);
       setWallet(walletData);
       setBooking(bookingData);
       setActiveTrip(tripsData.active);
@@ -678,6 +702,15 @@ function UserDashboard({ token, user, onLogout }: { token: string; user: User; o
     const timer = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    if (!mapMessage) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => setMapMessage(""), 10000);
+    return () => window.clearTimeout(timer);
+  }, [mapMessage]);
 
   useEffect(() => {
     if (booking && bookingSecondsLeft === 0) {
@@ -864,6 +897,7 @@ function UserDashboard({ token, user, onLogout }: { token: string; user: User; o
                 onDestinationLocationChange={activeTrip ? handleDestinationChange : undefined}
                 routeFrom={activeTripStart}
                 onRouteSummaryChange={setDestinationRouteSummary}
+                bonusZones={bonusZones}
               />
 
               {activeTrip && (
@@ -1092,7 +1126,7 @@ function UserDashboard({ token, user, onLogout }: { token: string; user: User; o
             )}
           </div>
 
-          <div className="panel">
+          <div className={`panel ${activeTrip ? "trip-activity-panel" : ""}`}>
             <span className="eyebrow">Поездка</span>
             <h2>Активная поездка</h2>
             {activeTrip ? (
@@ -1146,31 +1180,74 @@ function UserDashboard({ token, user, onLogout }: { token: string; user: User; o
 }
 
 function AdminDashboard({ token, user, onLogout }: { token: string; user: User; onLogout: () => void }) {
-  const [tab, setTab] = useState<AdminTab>("fleet");
+  const [tab, setTab] = useState<AdminTab>("map");
+  const [adminUsers, setAdminUsers] = useState<User[]>([]);
   const [applications, setApplications] = useState<User[]>([]);
   const [cars, setCars] = useState<Car[]>([]);
+  const [wallet, setWallet] = useState<Wallet | null>(null);
+  const [adminBooking, setAdminBooking] = useState<Booking | null>(null);
+  const [adminTrips, setAdminTrips] = useState<{ active: Trip | null; history: Trip[] }>({ active: null, history: [] });
+  const [allBookings, setAllBookings] = useState<Booking[]>([]);
+  const [allTrips, setAllTrips] = useState<Trip[]>([]);
   const [tariff, setTariff] = useState<Tariff | null>(null);
   const [coefficients, setCoefficients] = useState<TimeCoefficient[]>([]);
+  const [bonusZones, setBonusZones] = useState<BonusZone[]>([]);
   const [carForm, setCarForm] = useState<CarForm>(initialCarForm);
+  const [coefficientForm, setCoefficientForm] = useState({
+    name: "",
+    start_time: "10:00",
+    end_time: "16:30",
+    coefficient: "1.00",
+  });
+  const [zoneForm, setZoneForm] = useState<BonusZoneForm>(initialBonusZoneForm);
   const [selectedCarId, setSelectedCarId] = useState<number | null>(null);
+  const [editingCarId, setEditingCarId] = useState<number | null>(null);
+  const [editingZoneId, setEditingZoneId] = useState<number | null>(null);
+  const [topUpAmount, setTopUpAmount] = useState("500");
   const [message, setMessage] = useState("");
 
   const selectedCar = cars.find((car) => car.id === selectedCarId) ?? null;
-  const pendingUsers = applications.filter((item) => item.verification_status === "pending");
+  const pendingUsers = applications;
 
   const loadAdminData = async () => {
     try {
-      const [usersData, carsData, tariffData, coefficientsData] = await Promise.all([
+      const [
+        usersData,
+        applicationsData,
+        carsData,
+        walletData,
+        bookingData,
+        tripsData,
+        allBookingsData,
+        allTripsData,
+        tariffData,
+        coefficientsData,
+        bonusZonesData,
+      ] = await Promise.all([
+        api.adminUsers(token),
         api.adminApplications(token),
         api.adminCars(token),
+        api.wallet(token),
+        api.booking(token),
+        api.trips(token),
+        api.adminBookings(token),
+        api.adminTrips(token),
         api.adminTariff(token),
         api.adminCoefficients(token),
+        api.adminBonusZones(token),
       ]);
 
-      setApplications(usersData);
+      setAdminUsers(usersData);
+      setApplications(applicationsData);
       setCars(carsData);
+      setWallet(walletData);
+      setAdminBooking(bookingData);
+      setAdminTrips(tripsData);
+      setAllBookings(allBookingsData);
+      setAllTrips(allTripsData);
       setTariff(tariffData);
       setCoefficients(coefficientsData);
+      setBonusZones(bonusZonesData);
       setSelectedCarId((currentSelectedCarId) => {
         if (currentSelectedCarId && carsData.some((car) => car.id === currentSelectedCarId)) {
           return currentSelectedCarId;
@@ -1187,6 +1264,15 @@ function AdminDashboard({ token, user, onLogout }: { token: string; user: User; 
   useEffect(() => {
     void loadAdminData();
   }, [token]);
+
+  useEffect(() => {
+    if (!message) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => setMessage(""), 10000);
+    return () => window.clearTimeout(timer);
+  }, [message]);
 
   const runAction = async (action: () => Promise<unknown>, successText: string) => {
     setMessage("");
@@ -1207,6 +1293,82 @@ function AdminDashboard({ token, user, onLogout }: { token: string; user: User; 
     );
   };
 
+  const handleSaveCar = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const action = editingCarId
+      ? () => api.adminUpdateCar(token, editingCarId, carForm)
+      : () => api.adminCreateCar(token, carForm);
+    void runAction(action, editingCarId ? "Данные автомобиля обновлены" : "Автомобиль добавлен в автопарк").then(
+      () => {
+        setCarForm(initialCarForm);
+        setEditingCarId(null);
+      },
+    );
+  };
+
+  const startEditingCar = (car: Car) => {
+    setEditingCarId(car.id);
+    setSelectedCarId(car.id);
+    setCarForm({
+      brand: car.brand,
+      model: car.model,
+      license_plate: car.license_plate,
+      status: car.status,
+      latitude: car.latitude,
+      longitude: car.longitude,
+      price_per_minute: car.price_per_minute,
+    });
+  };
+
+  const handleCreateCoefficient = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    void runAction(() => api.adminCreateCoefficient(token, coefficientForm), "Коэффициент добавлен").then(() =>
+      setCoefficientForm({
+        name: "",
+        start_time: "10:00",
+        end_time: "16:30",
+        coefficient: "1.00",
+      }),
+    );
+  };
+
+  const handleZoneCenterChange = (coords: Coordinates) => {
+    if (!isInsideMkad(coords)) {
+      setMessage("Зону можно поставить только внутри МКАД");
+      return;
+    }
+
+    setZoneForm((form) => ({
+      ...form,
+      latitude: toApiCoordinate(coords[0]),
+      longitude: toApiCoordinate(coords[1]),
+    }));
+    setMessage("Центр бонусной зоны выбран на карте");
+  };
+
+  const handleSaveBonusZone = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const action = editingZoneId
+      ? () => api.adminUpdateBonusZone(token, editingZoneId, zoneForm)
+      : () => api.adminCreateBonusZone(token, zoneForm);
+    void runAction(action, editingZoneId ? "Бонусная зона обновлена" : "Бонусная зона создана").then(() => {
+      setZoneForm(initialBonusZoneForm);
+      setEditingZoneId(null);
+    });
+  };
+
+  const startEditingZone = (zone: BonusZone) => {
+    setEditingZoneId(zone.id);
+    setZoneForm({
+      name: zone.name,
+      latitude: zone.latitude,
+      longitude: zone.longitude,
+      radius_meters: String(zone.radius_meters),
+      discount_percent: zone.discount_percent,
+      is_active: zone.is_active,
+    });
+  };
+
   return (
     <main className="dashboard-page">
       <header className="topbar">
@@ -1224,13 +1386,20 @@ function AdminDashboard({ token, user, onLogout }: { token: string; user: User; 
         value={tab}
         onChange={setTab}
         items={[
-          { value: "fleet", label: "Автопарк" },
+          { value: "map", label: "Карта" },
+          { value: "wallet", label: "Кошелек" },
+          { value: "activity", label: "Активность" },
+          { value: "users", label: "Пользователи" },
           { value: "applications", label: "Заявки" },
+          { value: "fleet", label: "Автомобили" },
+          { value: "bookings", label: "Брони" },
+          { value: "trips", label: "Поездки" },
           { value: "tariff", label: "Тариф" },
+          { value: "zones", label: "Зоны" },
         ]}
       />
 
-      {tab === "fleet" && (
+      {tab === "map" && (
         <section className="dashboard-grid">
           <div className="panel wide-panel">
             <div className="hero-row">
@@ -1246,6 +1415,7 @@ function AdminDashboard({ token, user, onLogout }: { token: string; user: User; 
                 selectedCarId={selectedCarId}
                 onCarSelect={setSelectedCarId}
                 routeCar={null}
+                bonusZones={bonusZones.filter((zone) => zone.is_active)}
               />
 
               {selectedCar && (
@@ -1290,65 +1460,244 @@ function AdminDashboard({ token, user, onLogout }: { token: string; user: User; 
               )}
             </div>
           </div>
+        </section>
+      )}
 
+      {tab === "wallet" && (
+        <section className="dashboard-grid">
           <div className="panel">
-            <span className="eyebrow">Добавление</span>
-            <h2>Новый автомобиль</h2>
-            <form className="form-stack" onSubmit={handleCreateCar}>
+            <span className="eyebrow">Кошелек администратора</span>
+            <h2>{formatMoney(wallet?.balance ?? user.balance)}</h2>
+            <form
+              className="form-stack"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void runAction(() => api.topUp(token, topUpAmount), "Баланс успешно пополнен");
+              }}
+            >
               <input
-                placeholder="Марка"
-                value={carForm.brand}
-                onChange={(event) => setCarForm((form) => ({ ...form, brand: event.target.value }))}
-                required
-              />
-              <input
-                placeholder="Модель"
-                value={carForm.model}
-                onChange={(event) => setCarForm((form) => ({ ...form, model: event.target.value }))}
-                required
-              />
-              <input
-                placeholder="Госномер"
-                value={carForm.license_plate}
-                onChange={(event) => setCarForm((form) => ({ ...form, license_plate: event.target.value }))}
-                required
-              />
-              <div className="two-columns">
-                <input
-                  placeholder="Широта"
-                  value={carForm.latitude}
-                  onChange={(event) => setCarForm((form) => ({ ...form, latitude: event.target.value }))}
-                  required
-                />
-                <input
-                  placeholder="Долгота"
-                  value={carForm.longitude}
-                  onChange={(event) => setCarForm((form) => ({ ...form, longitude: event.target.value }))}
-                  required
-                />
-              </div>
-              <input
-                placeholder="Цена за минуту"
-                value={carForm.price_per_minute}
-                onChange={(event) => setCarForm((form) => ({ ...form, price_per_minute: event.target.value }))}
-                required
+                type="number"
+                min="1"
+                step="0.01"
+                value={topUpAmount}
+                onChange={(event) => setTopUpAmount(event.target.value)}
+                placeholder="Сумма пополнения"
               />
               <button className="primary-button" type="submit">
-                Добавить
+                Пополнить
               </button>
             </form>
           </div>
 
           <div className="panel">
-            <span className="eyebrow">Подсказка</span>
-            <h2>Работа с картой</h2>
-            <p className="helper-text">
-              Клик по маркеру машины открывает карточку справа. Через нее можно менять статус без отдельного
-              списка всех автомобилей
-            </p>
-            <p className="helper-text">
-              Для отображения карты в админке используется тот же ключ Яндекс Карт, что и в пользовательской части
-            </p>
+            <span className="eyebrow">История</span>
+            <h2>Операции кошелька</h2>
+            <div className="simple-list history-list">
+              {wallet?.transactions.map((transaction) => (
+                <div className="list-card" key={transaction.id}>
+                  <div>
+                    <strong>{transaction.description}</strong>
+                    <span>{formatDateTime(transaction.created_at)}</span>
+                  </div>
+                  <strong>{formatMoney(transaction.amount)}</strong>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {tab === "activity" && (
+        <section className="dashboard-grid">
+          <div className="panel">
+            <span className="eyebrow">Бронь</span>
+            <h2>Активная бронь</h2>
+            {adminBooking ? (
+              <div className="list-card">
+                <div>
+                  <strong>
+                    {adminBooking.car.brand} {adminBooking.car.model}
+                  </strong>
+                  <span>{adminBooking.car.license_plate}</span>
+                </div>
+                <button
+                  className="ghost-button"
+                  type="button"
+                  onClick={() => void runAction(() => api.cancelBooking(token, adminBooking.id), "Бронь отменена")}
+                >
+                  Отменить
+                </button>
+              </div>
+            ) : (
+              <p className="muted">Активной брони нет</p>
+            )}
+          </div>
+
+          <div className={`panel ${adminTrips.active ? "trip-activity-panel" : ""}`}>
+            <span className="eyebrow">Поездка</span>
+            <h2>Активная поездка</h2>
+            {adminTrips.active ? (
+              <div className="list-card">
+                <div>
+                  <strong>
+                    {adminTrips.active.car.brand} {adminTrips.active.car.model}
+                  </strong>
+                  <span>Начата: {formatDateTime(adminTrips.active.started_at)}</span>
+                </div>
+              </div>
+            ) : (
+              <p className="muted">Активной поездки нет</p>
+            )}
+          </div>
+        </section>
+      )}
+
+      {tab === "users" && (
+        <section className="dashboard-stack">
+          <div className="panel">
+            <span className="eyebrow">Пользователи</span>
+            <h2>Список пользователей</h2>
+            <div className="simple-list">
+              {adminUsers.map((item) => (
+                <div className="application-card" key={item.id}>
+                  <div>
+                    <strong>{item.full_name || buildFullName(item)}</strong>
+                    <span>{item.email}</span>
+                    <span>Телефон: {item.phone}</span>
+                    <span>Статус заявки: {item.verification_status}</span>
+                    <span>{item.is_blocked ? "Пользователь заблокирован" : "Пользователь активен"}</span>
+                  </div>
+                  <div className="button-row">
+                    <button
+                      className="ghost-button"
+                      type="button"
+                      onClick={() =>
+                        void runAction(
+                          () => api.adminUserAction(token, item.id, item.is_blocked ? "unblock" : "block"),
+                          item.is_blocked ? "Пользователь разблокирован" : "Пользователь заблокирован",
+                        )
+                      }
+                    >
+                      {item.is_blocked ? "Разблокировать" : "Заблокировать"}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {tab === "fleet" && (
+        <section className="dashboard-grid">
+          <div className="panel wide-panel">
+            <span className="eyebrow">Автомобили</span>
+            <h2>Список автопарка</h2>
+            <div className="simple-list">
+              {cars.map((car) => (
+                <div className="list-card" key={car.id}>
+                  <div>
+                    <strong>
+                      {car.brand} {car.model}
+                    </strong>
+                    <span>{car.license_plate}</span>
+                    <span>{car.status_label}</span>
+                  </div>
+                  <div className="button-row">
+                    <strong>{formatMoney(car.price_per_minute)} / мин</strong>
+                    <button className="ghost-button" type="button" onClick={() => startEditingCar(car)}>
+                      Редактировать
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="panel">
+            <span className="eyebrow">{editingCarId ? "Редактирование" : "Добавление"}</span>
+            <h2>{editingCarId ? "Данные автомобиля" : "Новый автомобиль"}</h2>
+            <form className="form-stack" onSubmit={handleSaveCar}>
+              <input placeholder="Марка" value={carForm.brand} onChange={(event) => setCarForm((form) => ({ ...form, brand: event.target.value }))} required />
+              <input placeholder="Модель" value={carForm.model} onChange={(event) => setCarForm((form) => ({ ...form, model: event.target.value }))} required />
+              <input placeholder="Госномер" value={carForm.license_plate} onChange={(event) => setCarForm((form) => ({ ...form, license_plate: event.target.value }))} required />
+              <select value={carForm.status} onChange={(event) => setCarForm((form) => ({ ...form, status: event.target.value }))}>
+                <option value="available">Доступен</option>
+                <option value="booked">Забронирован</option>
+                <option value="in_trip">В поездке</option>
+                <option value="service">На обслуживании</option>
+                <option value="inactive">Неактивен</option>
+              </select>
+              <div className="two-columns">
+                <input placeholder="Широта" value={carForm.latitude} onChange={(event) => setCarForm((form) => ({ ...form, latitude: event.target.value }))} required />
+                <input placeholder="Долгота" value={carForm.longitude} onChange={(event) => setCarForm((form) => ({ ...form, longitude: event.target.value }))} required />
+              </div>
+              <input placeholder="Цена за минуту" value={carForm.price_per_minute} onChange={(event) => setCarForm((form) => ({ ...form, price_per_minute: event.target.value }))} required />
+              <button className="primary-button" type="submit">
+                {editingCarId ? "Сохранить" : "Добавить"}
+              </button>
+              {editingCarId && (
+                <button
+                  className="ghost-button"
+                  type="button"
+                  onClick={() => {
+                    setEditingCarId(null);
+                    setCarForm(initialCarForm);
+                  }}
+                >
+                  Новый автомобиль
+                </button>
+              )}
+            </form>
+          </div>
+        </section>
+      )}
+
+      {tab === "bookings" && (
+        <section className="dashboard-stack">
+          <div className="panel">
+            <span className="eyebrow">Брони</span>
+            <h2>Все бронирования</h2>
+            <div className="simple-list">
+              {allBookings.map((bookingItem) => (
+                <div className="list-card" key={bookingItem.id}>
+                  <div>
+                    <strong>
+                      {bookingItem.car.brand} {bookingItem.car.model}
+                    </strong>
+                    <span>{bookingItem.user?.email ?? "Пользователь"}</span>
+                    <span>{formatDateTime(bookingItem.created_at)}</span>
+                  </div>
+                  <strong>{bookingItem.status}</strong>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {tab === "trips" && (
+        <section className="dashboard-stack">
+          <div className="panel">
+            <span className="eyebrow">Поездки</span>
+            <h2>Все поездки</h2>
+            <div className="simple-list">
+              {allTrips.map((trip) => (
+                <div className="list-card" key={trip.id}>
+                  <div>
+                    <strong>
+                      {trip.car.brand} {trip.car.model}
+                    </strong>
+                    <span>{trip.user?.email ?? "Пользователь"}</span>
+                    <span>
+                      {formatDateTime(trip.started_at)} · {trip.total_minutes} мин
+                    </span>
+                    {trip.bonus_zone_name && <span>Скидка: {trip.bonus_zone_name}</span>}
+                  </div>
+                  <strong>{trip.status === "completed" ? formatMoney(trip.total_price) : "Активна"}</strong>
+                </div>
+              ))}
+            </div>
           </div>
         </section>
       )}
@@ -1400,6 +1749,128 @@ function AdminDashboard({ token, user, onLogout }: { token: string; user: User; 
                 ))}
               </div>
             )}
+          </div>
+        </section>
+      )}
+
+      {tab === "zones" && (
+        <section className="dashboard-grid">
+          <div className="panel wide-panel">
+            <div className="hero-row">
+              <div>
+                <span className="eyebrow">Бонусные зоны</span>
+                <h2>Зоны возврата на карте</h2>
+              </div>
+              <span className="badge">Скидка при финише в зоне</span>
+            </div>
+            <div className="map-stage admin-map">
+              <FleetMap
+                cars={cars}
+                selectedCarId={selectedCarId}
+                onCarSelect={setSelectedCarId}
+                routeCar={null}
+                bonusZones={bonusZones}
+                onBonusZoneCenterChange={handleZoneCenterChange}
+              />
+            </div>
+          </div>
+
+          <div className="panel">
+            <span className="eyebrow">{editingZoneId ? "Редактирование" : "Создание"}</span>
+            <h2>{editingZoneId ? "Бонусная зона" : "Новая зона"}</h2>
+            <p className="helper-text">Кликните по карте, чтобы выбрать центр зоны. Пользователь увидит активные зоны на своей карте.</p>
+            <form className="form-stack" onSubmit={handleSaveBonusZone}>
+              <input
+                placeholder="Название зоны"
+                value={zoneForm.name}
+                onChange={(event) => setZoneForm((form) => ({ ...form, name: event.target.value }))}
+                required
+              />
+              <div className="two-columns">
+                <input
+                  placeholder="Широта"
+                  value={zoneForm.latitude}
+                  onChange={(event) => setZoneForm((form) => ({ ...form, latitude: event.target.value }))}
+                  required
+                />
+                <input
+                  placeholder="Долгота"
+                  value={zoneForm.longitude}
+                  onChange={(event) => setZoneForm((form) => ({ ...form, longitude: event.target.value }))}
+                  required
+                />
+              </div>
+              <div className="two-columns">
+                <input
+                  placeholder="Радиус, м"
+                  value={zoneForm.radius_meters}
+                  onChange={(event) => setZoneForm((form) => ({ ...form, radius_meters: event.target.value }))}
+                  required
+                />
+                <input
+                  placeholder="Скидка, %"
+                  value={zoneForm.discount_percent}
+                  onChange={(event) => setZoneForm((form) => ({ ...form, discount_percent: event.target.value }))}
+                  required
+                />
+              </div>
+              <label className="checkbox-row">
+                <input
+                  type="checkbox"
+                  checked={zoneForm.is_active}
+                  onChange={(event) => setZoneForm((form) => ({ ...form, is_active: event.target.checked }))}
+                />
+                Активна для пользователей
+              </label>
+              <button className="primary-button" type="submit">
+                {editingZoneId ? "Сохранить зону" : "Создать зону"}
+              </button>
+              {editingZoneId && (
+                <button
+                  className="ghost-button"
+                  type="button"
+                  onClick={() => {
+                    setEditingZoneId(null);
+                    setZoneForm(initialBonusZoneForm);
+                  }}
+                >
+                  Новая зона
+                </button>
+              )}
+            </form>
+          </div>
+
+          <div className="panel">
+            <span className="eyebrow">Список</span>
+            <h2>Все зоны</h2>
+            <div className="simple-list">
+              {bonusZones.map((zone) => (
+                <div className="list-card" key={zone.id}>
+                  <div>
+                    <strong>{zone.name}</strong>
+                    <span>{zone.radius_meters} м · скидка {zone.discount_percent}%</span>
+                    <span>{zone.is_active ? "Активна" : "Скрыта"}</span>
+                  </div>
+                  <div className="button-row">
+                    <button className="ghost-button" type="button" onClick={() => startEditingZone(zone)}>
+                      Редактировать
+                    </button>
+                    <button
+                      className="ghost-button"
+                      type="button"
+                      onClick={() =>
+                        void runAction(
+                          () => api.adminUpdateBonusZone(token, zone.id, { is_active: !zone.is_active }),
+                          zone.is_active ? "Зона скрыта" : "Зона активирована",
+                        )
+                      }
+                    >
+                      {zone.is_active ? "Скрыть" : "Включить"}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         </section>
       )}
@@ -1457,6 +1928,37 @@ function AdminDashboard({ token, user, onLogout }: { token: string; user: User; 
                 </div>
               ))}
             </div>
+            <form className="form-stack" onSubmit={handleCreateCoefficient}>
+              <input
+                placeholder="Название коэффициента"
+                value={coefficientForm.name}
+                onChange={(event) => setCoefficientForm((form) => ({ ...form, name: event.target.value }))}
+                required
+              />
+              <div className="two-columns">
+                <input
+                  type="time"
+                  value={coefficientForm.start_time}
+                  onChange={(event) => setCoefficientForm((form) => ({ ...form, start_time: event.target.value }))}
+                  required
+                />
+                <input
+                  type="time"
+                  value={coefficientForm.end_time}
+                  onChange={(event) => setCoefficientForm((form) => ({ ...form, end_time: event.target.value }))}
+                  required
+                />
+              </div>
+              <input
+                placeholder="Коэффициент"
+                value={coefficientForm.coefficient}
+                onChange={(event) => setCoefficientForm((form) => ({ ...form, coefficient: event.target.value }))}
+                required
+              />
+              <button className="primary-button" type="submit">
+                Добавить коэффициент
+              </button>
+            </form>
           </div>
         </section>
       )}
@@ -1502,12 +2004,15 @@ function FleetMap({
   onDestinationLocationChange,
   routeFrom = null,
   onRouteSummaryChange,
+  bonusZones = [],
+  onBonusZoneCenterChange,
 }: FleetMapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<YMapsMapInstance | null>(null);
   const ymapsRef = useRef<YMapsApi | null>(null);
   const locationChangeRef = useRef(onUserLocationChange);
   const destinationChangeRef = useRef(onDestinationLocationChange);
+  const bonusZoneCenterChangeRef = useRef(onBonusZoneCenterChange);
   const routeSummaryChangeRef = useRef(onRouteSummaryChange);
   const carSelectRef = useRef(onCarSelect);
   const [isLoading, setIsLoading] = useState(true);
@@ -1521,6 +2026,10 @@ function FleetMap({
   useEffect(() => {
     destinationChangeRef.current = onDestinationLocationChange;
   }, [onDestinationLocationChange]);
+
+  useEffect(() => {
+    bonusZoneCenterChangeRef.current = onBonusZoneCenterChange;
+  }, [onBonusZoneCenterChange]);
 
   useEffect(() => {
     routeSummaryChangeRef.current = onRouteSummaryChange;
@@ -1564,6 +2073,11 @@ function FleetMap({
           }
 
           const normalizedCoords: Coordinates = [Number(coords[0]), Number(coords[1])];
+          if (bonusZoneCenterChangeRef.current) {
+            bonusZoneCenterChangeRef.current(normalizedCoords);
+            return;
+          }
+
           if (destinationChangeRef.current) {
             destinationChangeRef.current(normalizedCoords);
             return;
@@ -1604,6 +2118,24 @@ function FleetMap({
     }
 
     map.geoObjects.removeAll();
+
+    for (const zone of bonusZones) {
+      const circle = new ymaps.Circle(
+        [[Number(zone.latitude), Number(zone.longitude)], Number(zone.radius_meters)],
+        {
+          hintContent: `${zone.name}: скидка ${zone.discount_percent}%`,
+          balloonContentHeader: zone.name,
+          balloonContentBody: `Скидка ${zone.discount_percent}% при завершении поездки в этой зоне`,
+        },
+        {
+          fillColor: "#f7a84b33",
+          strokeColor: "#d06a25",
+          strokeOpacity: 0.8,
+          strokeWidth: 2,
+        },
+      );
+      map.geoObjects.add(circle);
+    }
 
     for (const car of cars) {
       const placemark = new ymaps.Placemark(
@@ -1716,6 +2248,7 @@ function FleetMap({
     }
   }, [
     cars,
+    bonusZones,
     destinationLocation?.[0],
     destinationLocation?.[1],
     isMapReady,
@@ -1754,3 +2287,4 @@ function FleetMap({
 }
 
 export default App;
+

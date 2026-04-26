@@ -6,7 +6,7 @@ from rest_framework import serializers
 from apps.accounts.serializers import UserSerializer
 
 from .geo import is_inside_mkad
-from .models import Booking, Car, Tariff, TimeCoefficient, Trip, WalletTransaction
+from .models import Booking, BonusZone, Car, Tariff, TimeCoefficient, Trip, WalletTransaction
 
 
 User = get_user_model()
@@ -38,6 +38,7 @@ class CarSerializer(serializers.ModelSerializer):
 
 class BookingSerializer(serializers.ModelSerializer):
     car = CarSerializer(read_only=True)
+    user = UserSerializer(read_only=True)
     car_id = serializers.PrimaryKeyRelatedField(
         queryset=Car.objects.all(),
         source="car",
@@ -46,17 +47,20 @@ class BookingSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Booking
-        fields = ("id", "car", "car_id", "status", "created_at", "closed_at")
+        fields = ("id", "user", "car", "car_id", "status", "created_at", "closed_at")
         read_only_fields = ("id", "car", "status", "created_at", "closed_at")
 
 
 class TripSerializer(serializers.ModelSerializer):
     car = CarSerializer(read_only=True)
+    user = UserSerializer(read_only=True)
+    bonus_zone_name = serializers.CharField(source="bonus_zone.name", read_only=True)
 
     class Meta:
         model = Trip
         fields = (
             "id",
+            "user",
             "car",
             "status",
             "started_at",
@@ -69,6 +73,8 @@ class TripSerializer(serializers.ModelSerializer):
             "end_longitude",
             "price_per_minute",
             "coefficient",
+            "bonus_zone_name",
+            "discount_percent",
             "total_minutes",
             "total_price",
         )
@@ -120,6 +126,28 @@ class TimeCoefficientSerializer(serializers.ModelSerializer):
     class Meta:
         model = TimeCoefficient
         fields = ("id", "name", "start_time", "end_time", "coefficient")
+
+
+class BonusZoneSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = BonusZone
+        fields = (
+            "id",
+            "name",
+            "latitude",
+            "longitude",
+            "radius_meters",
+            "discount_percent",
+            "is_active",
+            "created_at",
+        )
+
+    def validate(self, attrs):
+        latitude = attrs.get("latitude", getattr(self.instance, "latitude", None))
+        longitude = attrs.get("longitude", getattr(self.instance, "longitude", None))
+        if latitude is not None and longitude is not None and not is_inside_mkad(latitude, longitude):
+            raise serializers.ValidationError("Зону можно поставить только внутри МКАД")
+        return attrs
 
 
 class AdminUserSerializer(UserSerializer):

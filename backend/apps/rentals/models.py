@@ -57,6 +57,22 @@ class TimeCoefficient(models.Model):
         return current_time >= self.start_time or current_time < self.end_time
 
 
+class BonusZone(models.Model):
+    name = models.CharField(max_length=120)
+    latitude = models.DecimalField(max_digits=9, decimal_places=6)
+    longitude = models.DecimalField(max_digits=9, decimal_places=6)
+    radius_meters = models.PositiveIntegerField(default=500)
+    discount_percent = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal("10.00"))
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["name"]
+
+    def __str__(self) -> str:
+        return self.name
+
+
 class Booking(models.Model):
     class Status(models.TextChoices):
         ACTIVE = "active", "Активна"
@@ -104,6 +120,8 @@ class Trip(models.Model):
     end_longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
     price_per_minute = models.DecimalField(max_digits=8, decimal_places=2)
     coefficient = models.DecimalField(max_digits=4, decimal_places=2, default=Decimal("1.00"))
+    bonus_zone = models.ForeignKey(BonusZone, on_delete=models.SET_NULL, null=True, blank=True, related_name="trips")
+    discount_percent = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal("0.00"))
     total_minutes = models.PositiveIntegerField(default=0)
     total_price = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal("0.00"))
 
