@@ -1,3 +1,4 @@
+import re
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
@@ -10,6 +11,8 @@ from .models import Booking, Car, Trip, WalletTransaction
 
 
 User = get_user_model()
+
+LICENSE_PLATE_RE = re.compile(r"^[АВЕКМНОРСТУХABEKMHOPCTYX]\d{3}[АВЕКМНОРСТУХABEKMHOPCTYX]{2}\d{2,3}$")
 
 
 def validate_mkad_coordinates(attrs):
@@ -36,6 +39,21 @@ class CarSerializer(serializers.ModelSerializer):
             "created_at",
         )
         read_only_fields = ("id", "status_label", "created_at")
+
+    def validate_license_plate(self, value):
+        license_plate = re.sub(r"[\s-]+", "", value.strip()).upper()
+        if not LICENSE_PLATE_RE.fullmatch(license_plate):
+            raise serializers.ValidationError("Введите госномер в формате А123ВС77 или А123ВС777")
+        return license_plate
+
+    def validate(self, attrs):
+        latitude = attrs.get("latitude", self.instance.latitude if self.instance else None)
+        longitude = attrs.get("longitude", self.instance.longitude if self.instance else None)
+
+        if latitude is not None and longitude is not None:
+            validate_mkad_coordinates({"latitude": latitude, "longitude": longitude})
+
+        return attrs
 
 
 class BookingSerializer(serializers.ModelSerializer):

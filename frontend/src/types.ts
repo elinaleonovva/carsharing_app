@@ -32,7 +32,6 @@ export type AuthForm = {
 };
 
 export type CarForm = {
-  id: string;
   brand: string;
   model: string;
   license_plate: string;
@@ -40,7 +39,6 @@ export type CarForm = {
   latitude: string;
   longitude: string;
   price_per_minute: string;
-  created_at: string;
 };
 
 export type BonusZoneForm = {

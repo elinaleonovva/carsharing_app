@@ -27,7 +27,6 @@ type AuthForm = {
 };
 
 type CarForm = {
-  id: string;
   brand: string;
   model: string;
   license_plate: string;
@@ -35,7 +34,6 @@ type CarForm = {
   latitude: string;
   longitude: string;
   price_per_minute: string;
-  created_at: string;
 };
 
 type BonusZoneForm = {
@@ -93,6 +91,8 @@ const moneyFormatter = new Intl.NumberFormat("ru-RU", {
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const phonePattern = /^\d+$/;
 const driverLicenseSeriesPattern = /^[0-9A-Za-zА-Яа-яЁё]{4}$/;
+const licensePlatePattern = "^[АВЕКМНОРСТУХABEKMHOPCTYX][0-9]{3}[АВЕКМНОРСТУХABEKMHOPCTYX]{2}[0-9]{2,3}$";
+const blockedNumberKeys = ["e", "E", "+"];
 
 const initialAuthForm: AuthForm = {
   email: "",
@@ -106,7 +106,6 @@ const initialAuthForm: AuthForm = {
 };
 
 const initialCarForm: CarForm = {
-  id: "",
   brand: "",
   model: "",
   license_plate: "",
@@ -114,7 +113,6 @@ const initialCarForm: CarForm = {
   latitude: "55.751244",
   longitude: "37.618423",
   price_per_minute: "12.00",
-  created_at: "",
 };
 
 const initialBonusZoneForm: BonusZoneForm = {
@@ -1472,6 +1470,19 @@ function AdminDashboard({ token, user, onLogout }: { token: string; user: User; 
 
   const handleSaveCar = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    const latitude = Number(carForm.latitude);
+    const longitude = Number(carForm.longitude);
+
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+      setMessage("Введите корректные числовые координаты автомобиля");
+      return;
+    }
+
+    if (!isInsideMkad([latitude, longitude])) {
+      setMessage("Автомобиль можно добавить только внутри МКАД");
+      return;
+    }
+
     const payload = buildCarPayload();
     const action = editingCarId
       ? () => api.adminUpdateCar(token, editingCarId, payload)
@@ -1490,7 +1501,6 @@ function AdminDashboard({ token, user, onLogout }: { token: string; user: User; 
     setEditingCarId(car.id);
     setSelectedCarId(car.id);
     setCarForm({
-      id: String(car.id),
       brand: car.brand,
       model: car.model,
       license_plate: car.license_plate,
@@ -1498,7 +1508,6 @@ function AdminDashboard({ token, user, onLogout }: { token: string; user: User; 
       latitude: car.latitude,
       longitude: car.longitude,
       price_per_minute: car.price_per_minute,
-      created_at: car.created_at,
     });
   };
 
@@ -1963,8 +1972,110 @@ function AdminDashboard({ token, user, onLogout }: { token: string; user: User; 
       )}
 
       {tab === "fleet" && (
-        <section className="dashboard-grid">
-          <div className="panel wide-panel">
+        <section className="dashboard-grid fleet-layout">
+          <div className="panel">
+            <span className="eyebrow">{editingCarId ? "Редактирование" : "Добавление"}</span>
+            <h2>{editingCarId ? "Данные автомобиля" : "Новый автомобиль"}</h2>
+            <form className="form-stack" onSubmit={handleSaveCar}>
+              <label>
+                Марка
+                <input value={carForm.brand} onChange={(event) => setCarForm((form) => ({ ...form, brand: event.target.value }))} required />
+              </label>
+              <label>
+                Модель
+                <input value={carForm.model} onChange={(event) => setCarForm((form) => ({ ...form, model: event.target.value }))} required />
+              </label>
+              <label>
+                Госномер
+                <input
+                  value={carForm.license_plate}
+                  onChange={(event) =>
+                    setCarForm((form) => ({
+                      ...form,
+                      license_plate: event.target.value.replace(/[\s-]+/g, "").toUpperCase(),
+                    }))
+                  }
+                  maxLength={9}
+                  pattern={licensePlatePattern}
+                  title="Введите госномер в формате А123ВС77 или А123ВС777"
+                  required
+                />
+              </label>
+              <label>
+                Статус
+                <select value={carForm.status} onChange={(event) => setCarForm((form) => ({ ...form, status: event.target.value }))}>
+                  <option value="available">Доступен</option>
+                  <option value="booked">Забронирован</option>
+                  <option value="in_trip">В поездке</option>
+                  <option value="service">На обслуживании</option>
+                  <option value="inactive">Неактивен</option>
+                </select>
+              </label>
+              <div className="two-columns">
+                <label>
+                  Широта
+                  <input
+                    value={carForm.latitude}
+                    onChange={(event) => setCarForm((form) => ({ ...form, latitude: event.target.value }))}
+                    onKeyDown={(event) => {
+                      if (blockedNumberKeys.includes(event.key)) event.preventDefault();
+                    }}
+                    type="number"
+                    inputMode="decimal"
+                    min="55.55"
+                    max="55.92"
+                    step="0.000001"
+                    required
+                  />
+                </label>
+                <label>
+                  Долгота
+                  <input
+                    value={carForm.longitude}
+                    onChange={(event) => setCarForm((form) => ({ ...form, longitude: event.target.value }))}
+                    onKeyDown={(event) => {
+                      if (blockedNumberKeys.includes(event.key)) event.preventDefault();
+                    }}
+                    type="number"
+                    inputMode="decimal"
+                    min="37.35"
+                    max="37.86"
+                    step="0.000001"
+                    required
+                  />
+                </label>
+              </div>
+              <label>
+                Цена за минуту
+                <input
+                  value={carForm.price_per_minute}
+                  onChange={(event) => setCarForm((form) => ({ ...form, price_per_minute: event.target.value }))}
+                  onKeyDown={(event) => {
+                    if (blockedNumberKeys.includes(event.key) || event.key === "-") event.preventDefault();
+                  }}
+                  type="number"
+                  inputMode="decimal"
+                  min="0.01"
+                  step="0.01"
+                  required
+                />
+              </label>
+              <button className="primary-button" type="submit">
+                {editingCarId ? "Сохранить" : "Добавить"}
+              </button>
+              {editingCarId && (
+                <button
+                  className="ghost-button"
+                  type="button"
+                  onClick={resetCarForm}
+                >
+                  Новый автомобиль
+                </button>
+              )}
+            </form>
+          </div>
+
+          <div className="panel">
             <span className="eyebrow">Автомобили</span>
             <h2>Список автопарка</h2>
             <div className="simple-list section-content-offset">
@@ -1986,69 +2097,6 @@ function AdminDashboard({ token, user, onLogout }: { token: string; user: User; 
                 </div>
               ))}
             </div>
-          </div>
-
-          <div className="panel">
-            <span className="eyebrow">{editingCarId ? "Редактирование" : "Добавление"}</span>
-            <h2>{editingCarId ? "Данные автомобиля" : "Новый автомобиль"}</h2>
-            <form className="form-stack" onSubmit={handleSaveCar}>
-              <label>
-                ID
-                <input value={carForm.id || "Будет присвоен автоматически"} disabled />
-              </label>
-              <label>
-                Марка
-                <input value={carForm.brand} onChange={(event) => setCarForm((form) => ({ ...form, brand: event.target.value }))} required />
-              </label>
-              <label>
-                Модель
-                <input value={carForm.model} onChange={(event) => setCarForm((form) => ({ ...form, model: event.target.value }))} required />
-              </label>
-              <label>
-                Госномер
-                <input value={carForm.license_plate} onChange={(event) => setCarForm((form) => ({ ...form, license_plate: event.target.value }))} required />
-              </label>
-              <label>
-                Статус
-                <select value={carForm.status} onChange={(event) => setCarForm((form) => ({ ...form, status: event.target.value }))}>
-                  <option value="available">Доступен</option>
-                  <option value="booked">Забронирован</option>
-                  <option value="in_trip">В поездке</option>
-                  <option value="service">На обслуживании</option>
-                  <option value="inactive">Неактивен</option>
-                </select>
-              </label>
-              <div className="two-columns">
-                <label>
-                  Широта
-                  <input value={carForm.latitude} onChange={(event) => setCarForm((form) => ({ ...form, latitude: event.target.value }))} required />
-                </label>
-                <label>
-                  Долгота
-                  <input value={carForm.longitude} onChange={(event) => setCarForm((form) => ({ ...form, longitude: event.target.value }))} required />
-                </label>
-              </div>
-              <label>
-                Цена за минуту
-                <input value={carForm.price_per_minute} onChange={(event) => setCarForm((form) => ({ ...form, price_per_minute: event.target.value }))} required />
-              </label>
-              <label>
-                Дата создания
-                <input value={carForm.created_at ? formatDateTime(carForm.created_at) : "Создастся автоматически"} disabled />
-              </label>
-              <button className="primary-button" type="submit">
-                {editingCarId ? "Сохранить" : "Добавить"}
-              </button>
-              {editingCarId && (
-                <button
-                  className="ghost-button"
-                  type="button"
-                  onClick={resetCarForm}
-                >
-                  Новый автомобиль
-                </button>
-              )}
-            </form>
           </div>
         </section>
       )}

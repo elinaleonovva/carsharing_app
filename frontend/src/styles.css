@@ -924,6 +924,53 @@ body {
   margin-top: 2px;
 }
 
+.fleet-layout > .panel:first-child {
+  overflow: hidden;
+}
+
+.fleet-layout > .panel:first-child h2 {
+  margin-bottom: 12px;
+  font-size: 22px;
+}
+
+.fleet-layout > .panel:first-child .form-stack {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 12px;
+  overflow: visible;
+  padding-right: 0;
+}
+
+.fleet-layout > .panel:first-child .form-stack > label,
+.fleet-layout > .panel:first-child .form-stack > button,
+.fleet-layout > .panel:first-child .form-stack > .two-columns {
+  min-width: 0;
+}
+
+.fleet-layout > .panel:first-child .form-stack > button {
+  grid-column: 1 / -1;
+}
+
+.fleet-layout > .panel:first-child .two-columns {
+  display: contents;
+}
+
+.fleet-layout > .panel:first-child label {
+  gap: 6px;
+  font-size: 13px;
+}
+
+.fleet-layout > .panel:first-child input,
+.fleet-layout > .panel:first-child select {
+  min-height: 42px;
+  border-radius: 13px;
+}
+
+.fleet-layout > .panel:first-child .primary-button,
+.fleet-layout > .panel:first-child .ghost-button {
+  min-height: 42px;
+  border-radius: 13px;
+}
+
 .panel {
   display: flex;
   min-height: 0;
@@ -1158,6 +1205,19 @@ body {
   .button-row {
     flex-direction: column;
     gap: 8px;
+  }
+
+  .fleet-layout > .panel:first-child {
+    overflow: auto;
+  }
+
+  .fleet-layout > .panel:first-child .form-stack {
+    grid-template-columns: 1fr;
+    overflow-y: auto;
+  }
+
+  .fleet-layout > .panel:first-child .two-columns {
+    display: grid;
   }
 
   .map-popup {
