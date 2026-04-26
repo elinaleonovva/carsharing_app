@@ -129,4 +129,4 @@ class AdminUserSerializer(UserSerializer):
 
 
 class AdminUserActionSerializer(serializers.Serializer):
-    action = serializers.ChoiceField(choices=["approve", "reject", "block", "unblock"])
+    action = serializers.ChoiceField(choices=["approve", "reject"])

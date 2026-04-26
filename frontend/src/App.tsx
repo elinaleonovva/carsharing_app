@@ -1185,12 +1185,37 @@ function AdminDashboard({ token, user, onLogout }: { token: string; user: User; 
   const [editingCarId, setEditingCarId] = useState<number | null>(null);
   const [editingZoneId, setEditingZoneId] = useState<number | null>(null);
   const [topUpAmount, setTopUpAmount] = useState("500");
+  const [userLocation, setUserLocation] = useState<Coordinates | null>(null);
+  const [destinationLocation, setDestinationLocation] = useState<Coordinates | null>(null);
+  const [destinationRouteSummary, setDestinationRouteSummary] = useState<RouteSummary>({
+    distanceKm: null,
+    durationMinutes: null,
+  });
+  const [mapMessage, setMapMessage] = useState("");
+  const [walletMessage, setWalletMessage] = useState("");
+  const [activityMessage, setActivityMessage] = useState("");
+  const [now, setNow] = useState(Date.now());
+  const [isRefreshing, setIsRefreshing] = useState(true);
   const [message, setMessage] = useState("");
 
   const selectedCar = cars.find((car) => car.id === selectedCarId) ?? null;
   const pendingUsers = applications;
+  const activeTrip = adminTrips.active;
+  const history = adminTrips.history;
+  const selectedCarDistance = calculateDistanceKm(
+    userLocation,
+    selectedCar ? getCarCoords(selectedCar) : null,
+  );
+  const hasDebt = Number(wallet?.balance ?? user.balance) < 0;
+  const activeTripStart = activeTrip ? getCarCoords(activeTrip.car) : null;
+  const estimatedTripPrice = calculateEstimatedTripPrice(activeTrip, destinationRouteSummary.durationMinutes);
+  const bookingSecondsLeft = getBookingSecondsLeft(adminBooking, now);
 
-  const loadAdminData = async () => {
+  const loadAdminData = async (showLoader = false) => {
+    if (showLoader) {
+      setIsRefreshing(true);
+    }
+
     try {
       const [
         usersData,
@@ -1224,6 +1249,8 @@ function AdminDashboard({ token, user, onLogout }: { token: string; user: User; 
       setWallet(walletData);
       setAdminBooking(bookingData);
       setAdminTrips(tripsData);
+      setDestinationLocation(getTripDestination(tripsData.active));
+      setDestinationRouteSummary({ distanceKm: null, durationMinutes: null });
       setAllBookings(allBookingsData);
       setAllTrips(allTripsData);
       setTariff(tariffData);
@@ -1234,17 +1261,49 @@ function AdminDashboard({ token, user, onLogout }: { token: string; user: User; 
           return currentSelectedCarId;
         }
 
-        return carsData[0]?.id ?? null;
+        return null;
       });
       setMessage("");
     } catch (error) {
       setMessage(getErrorMessage(error));
+    } finally {
+      if (showLoader) {
+        setIsRefreshing(false);
+      }
     }
   };
 
   useEffect(() => {
-    void loadAdminData();
+    void loadAdminData(true);
   }, [token]);
+
+  useEffect(() => {
+    const dataTimer = window.setInterval(() => {
+      void loadAdminData();
+    }, 30000);
+
+    return () => window.clearInterval(dataTimer);
+  }, [token]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    if (!mapMessage) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => setMapMessage(""), 10000);
+    return () => window.clearTimeout(timer);
+  }, [mapMessage]);
+
+  useEffect(() => {
+    if (adminBooking && bookingSecondsLeft === 0) {
+      void loadAdminData();
+    }
+  }, [adminBooking, bookingSecondsLeft]);
 
   useEffect(() => {
     if (!message) {
@@ -1265,6 +1324,135 @@ function AdminDashboard({ token, user, onLogout }: { token: string; user: User; 
     } catch (error) {
       setMessage(getErrorMessage(error));
     }
+  };
+
+  const runServiceAction = async (
+    action: () => Promise<unknown>,
+    successText: string,
+    setSectionMessage: (message: string) => void,
+  ) => {
+    setSectionMessage("");
+
+    try {
+      await action();
+      await loadAdminData();
+      setSectionMessage(successText);
+    } catch (error) {
+      setSectionMessage(getErrorMessage(error));
+    }
+  };
+
+  const handleUserLocationChange = (coords: Coordinates) => {
+    if (!isInsideMkad(coords)) {
+      setMapMessage("Точку можно поставить только внутри МКАД");
+      return;
+    }
+
+    setUserLocation(coords);
+    setMapMessage("");
+  };
+
+  const handleBookSelectedCar = () => {
+    if (hasDebt) {
+      setMapMessage("Сначала погасите задолженность в кошельке");
+      return;
+    }
+
+    if (!selectedCar) {
+      setMapMessage("Сначала выберите машину на карте");
+      return;
+    }
+
+    void runServiceAction(
+      () => api.createBooking(token, selectedCar.id),
+      "Машина забронирована на 15 минут",
+      setMapMessage,
+    );
+  };
+
+  const handleStartTrip = () => {
+    if (hasDebt) {
+      setMapMessage("Сначала погасите задолженность в кошельке");
+      return;
+    }
+
+    if (!selectedCar) {
+      setMapMessage("Сначала выберите машину на карте");
+      return;
+    }
+
+    if (!userLocation) {
+      setMapMessage("Сначала поставьте свою точку на карте");
+      return;
+    }
+
+    setMapMessage("");
+    void api
+      .startTrip(token, selectedCar.id, toApiCoordinate(userLocation[0]), toApiCoordinate(userLocation[1]))
+      .then(async () => {
+        setSelectedCarId(null);
+        setDestinationLocation(null);
+        setDestinationRouteSummary({ distanceKm: null, durationMinutes: null });
+        await loadAdminData();
+        setMapMessage("Поездка началась. Теперь поставьте точку назначения на карте");
+      })
+      .catch((error) => setMapMessage(getErrorMessage(error)));
+  };
+
+  const handleDestinationChange = (coords: Coordinates) => {
+    if (!activeTrip) {
+      return;
+    }
+
+    if (!isInsideMkad(coords)) {
+      setMapMessage("Точку назначения можно поставить только внутри МКАД");
+      return;
+    }
+
+    setDestinationLocation(coords);
+    setDestinationRouteSummary({ distanceKm: null, durationMinutes: null });
+    void api
+      .setTripDestination(token, activeTrip.id, toApiCoordinate(coords[0]), toApiCoordinate(coords[1]))
+      .then((trip) => {
+        setAdminTrips((current) => ({ ...current, active: trip }));
+        setMapMessage("");
+      })
+      .catch((error) => setMapMessage(getErrorMessage(error)));
+  };
+
+  const handleFinishTrip = (setSectionMessage = setMapMessage) => {
+    if (!activeTrip) {
+      setSectionMessage("Активной поездки нет");
+      return;
+    }
+
+    if (!destinationLocation) {
+      setSectionMessage("Перед завершением поставьте точку назначения на карте");
+      return;
+    }
+
+    void runServiceAction(
+      () =>
+        api.finishTrip(
+          token,
+          activeTrip.id,
+          toApiCoordinate(destinationLocation[0]),
+          toApiCoordinate(destinationLocation[1]),
+          destinationRouteSummary.durationMinutes ?? undefined,
+        ),
+      "Поездка завершена",
+      setSectionMessage,
+    );
+  };
+
+  const bookingBelongsToSelectedCar = adminBooking?.car.id === selectedCar?.id;
+  const bookingBelongsToAnotherCar = Boolean(adminBooking && selectedCar && adminBooking.car.id !== selectedCar.id);
+
+  const handleTabChange = (nextTab: AdminTab) => {
+    setTab(nextTab);
+    if (nextTab === "map") setMapMessage("");
+    if (nextTab === "wallet") setWalletMessage("");
+    if (nextTab === "activity") setActivityMessage("");
   };
 
   const handleCreateCar = (event: FormEvent<HTMLFormElement>) => {
@@ -1365,7 +1553,7 @@ function AdminDashboard({ token, user, onLogout }: { token: string; user: User; 
 
       <TabBar<AdminTab>
         value={tab}
-        onChange={setTab}
+        onChange={handleTabChange}
         items={[
           { value: "map", label: "Карта" },
           { value: "wallet", label: "Кошелек" },
@@ -1381,26 +1569,93 @@ function AdminDashboard({ token, user, onLogout }: { token: string; user: User; 
       />
 
       {tab === "map" && (
-        <section className="dashboard-grid">
-          <div className="panel wide-panel">
+        <section className="dashboard-stack">
+          <div className="panel hero-panel">
             <div className="hero-row">
               <div>
-                <span className="eyebrow">Карта парка</span>
-                <h2>Машины на реальной карте Москвы</h2>
+                <span className="eyebrow">Карта Москвы</span>
+                <h2>Машины рядом на карте</h2>
               </div>
-              <span className="badge">Всего машин: {cars.length}</span>
             </div>
-            <div className="map-stage admin-map">
+            <p className="helper-text">
+              Нажмите на карту, чтобы поставить свою точку. Затем выберите машину: маршрут
+              построится автоматически
+            </p>
+          </div>
+
+          <div className="panel map-panel">
+            <div className="map-stage">
+              {mapMessage && <p className="message map-message">{mapMessage}</p>}
               <FleetMap
                 cars={cars}
                 selectedCarId={selectedCarId}
                 onCarSelect={setSelectedCarId}
-                routeCar={null}
+                userLocation={activeTrip ? null : userLocation}
+                onUserLocationChange={activeTrip ? undefined : handleUserLocationChange}
+                routeCar={activeTrip ? null : selectedCar}
+                destinationLocation={destinationLocation}
+                onDestinationLocationChange={activeTrip ? handleDestinationChange : undefined}
+                routeFrom={activeTripStart}
+                onRouteSummaryChange={setDestinationRouteSummary}
                 bonusZones={bonusZones.filter((zone) => zone.is_active)}
               />
 
-              {selectedCar && (
-                <aside className="map-popup admin-popup">
+              {activeTrip && (
+                <aside className="map-popup trip-popup">
+                  <span className="status-pill info">Поездка идет</span>
+                  <h3>
+                    {activeTrip.car.brand} {activeTrip.car.model}
+                  </h3>
+                  <p className="popup-lead">Поставьте на карте точку назначения</p>
+                  <div className="detail-list">
+                    <div>
+                      <span>Цена машины</span>
+                      <strong>{formatMoney(activeTrip.price_per_minute)} / мин</strong>
+                    </div>
+                    <div>
+                      <span>Маршрут</span>
+                      <strong>
+                        {destinationRouteSummary.distanceKm === null
+                          ? destinationLocation
+                            ? "Строится..."
+                            : "Выберите точку"
+                          : `${destinationRouteSummary.distanceKm} км`}
+                      </strong>
+                    </div>
+                    <div>
+                      <span>Время маршрута</span>
+                      <strong>
+                        {destinationRouteSummary.durationMinutes === null
+                          ? "Оценка появится после маршрута"
+                          : `${destinationRouteSummary.durationMinutes} мин`}
+                      </strong>
+                    </div>
+                    <div>
+                      <span>Примерно</span>
+                      <strong>{estimatedTripPrice ? formatMoney(estimatedTripPrice) : "После выбора точки"}</strong>
+                    </div>
+                  </div>
+                  <button
+                    className="primary-button"
+                    type="button"
+                    disabled={!destinationLocation || destinationRouteSummary.durationMinutes === null}
+                    onClick={() => handleFinishTrip(setMapMessage)}
+                  >
+                    Завершить поездку
+                  </button>
+                </aside>
+              )}
+
+              {!activeTrip && selectedCar && (
+                <aside className="map-popup car-popup">
+                  <button
+                    className="map-popup-close"
+                    type="button"
+                    aria-label="Закрыть карточку машины"
+                    onClick={() => setSelectedCarId(null)}
+                  >
+                    ×
+                  </button>
                   <span className={`status-pill ${getStatusTone(selectedCar.status)}`}>
                     {selectedCar.status_label}
                   </span>
@@ -1408,35 +1663,67 @@ function AdminDashboard({ token, user, onLogout }: { token: string; user: User; 
                     {selectedCar.brand} {selectedCar.model}
                   </h3>
                   <p className="popup-lead">Госномер: {selectedCar.license_plate}</p>
-                  <p className="popup-lead">Цена: {formatMoney(selectedCar.price_per_minute)} / мин</p>
-                  <label>
-                    Статус автомобиля
-                    <select
-                      value={selectedCar.status}
-                      onChange={(event) =>
-                        void runAction(
-                          () => api.adminUpdateCar(token, selectedCar.id, { status: event.target.value }),
-                          "Статус автомобиля обновлен.",
-                        )
-                      }
-                    >
-                      <option value="available">Доступен</option>
-                      <option value="booked">Забронирован</option>
-                      <option value="in_trip">В поездке</option>
-                      <option value="service">На обслуживании</option>
-                      <option value="inactive">Неактивен</option>
-                    </select>
-                  </label>
                   <div className="detail-list">
                     <div>
-                      <span>Широта</span>
-                      <strong>{selectedCar.latitude}</strong>
+                      <span>Маршрут</span>
+                      <strong>
+                        {userLocation
+                          ? selectedCarDistance === null
+                            ? "Строится..."
+                            : `Около ${selectedCarDistance} км`
+                          : "Сначала поставьте свою точку"}
+                      </strong>
                     </div>
                     <div>
-                      <span>Долгота</span>
-                      <strong>{selectedCar.longitude}</strong>
+                      <span>Бронь</span>
+                      <strong>
+                        {bookingBelongsToSelectedCar && bookingSecondsLeft !== null
+                          ? `Еще ${formatCountdown(bookingSecondsLeft)}`
+                          : "Не активна"}
+                      </strong>
+                    </div>
+                    <div>
+                      <span>Цена</span>
+                      <strong>{formatMoney(selectedCar.price_per_minute)} / мин</strong>
                     </div>
                   </div>
+                  <div className="button-row">
+                    <button
+                      className="secondary-button"
+                      type="button"
+                      disabled={hasDebt || Boolean(activeTrip || adminBooking)}
+                      onClick={handleBookSelectedCar}
+                    >
+                      {bookingBelongsToSelectedCar
+                        ? "Уже забронирована"
+                        : adminBooking
+                          ? "Есть активная бронь"
+                          : "Забронировать"}
+                    </button>
+                    <button
+                      className="primary-button"
+                      type="button"
+                      disabled={hasDebt || !userLocation || Boolean(activeTrip) || bookingBelongsToAnotherCar}
+                      onClick={handleStartTrip}
+                    >
+                      {activeTrip ? "Поездка уже идет" : "Начать поездку"}
+                    </button>
+                  </div>
+                  {!userLocation && (
+                    <p className="inline-note">
+                      Чтобы начать поездку, поставьте свою точку на карте
+                    </p>
+                  )}
+                  {hasDebt && (
+                    <p className="inline-note">
+                      Есть задолженность. Пополните кошелек, чтобы снова бронировать и начинать поездки
+                    </p>
+                  )}
+                  {bookingBelongsToAnotherCar && (
+                    <p className="inline-note">
+                      У вас уже есть активная бронь на другую машину. Сначала отмените ее в разделе активности
+                    </p>
+                  )}
                 </aside>
               )}
             </div>
@@ -1447,87 +1734,141 @@ function AdminDashboard({ token, user, onLogout }: { token: string; user: User; 
       {tab === "wallet" && (
         <section className="dashboard-grid">
           <div className="panel">
-            <span className="eyebrow">Кошелек администратора</span>
-            <h2>{formatMoney(wallet?.balance ?? user.balance)}</h2>
-            <form
-              className="form-stack"
-              onSubmit={(event) => {
-                event.preventDefault();
-                void runAction(() => api.topUp(token, topUpAmount), "Баланс успешно пополнен");
-              }}
-            >
+            <span className="eyebrow">Баланс</span>
+            <h2>Кошелек</h2>
+            <p className="big-number">{formatMoney(wallet?.balance ?? user.balance)}</p>
+            {hasDebt && (
+              <p className="inline-note">
+                Сейчас есть задолженность {formatMoney(Math.abs(Number(wallet?.balance ?? user.balance)))}
+              </p>
+            )}
+            <div className="inline-form wallet-top-up-form">
               <input
-                type="number"
-                min="1"
-                step="0.01"
                 value={topUpAmount}
                 onChange={(event) => setTopUpAmount(event.target.value)}
-                placeholder="Сумма пополнения"
+                type="number"
+                min="1"
+                step="1"
               />
-              <button className="primary-button" type="submit">
+              <button
+                className="primary-button"
+                type="button"
+                onClick={() =>
+                  void runServiceAction(() => api.topUp(token, topUpAmount), "Баланс успешно пополнен", setWalletMessage)
+                }
+              >
                 Пополнить
               </button>
-            </form>
+            </div>
+            {walletMessage && <p className="message section-message wallet-message">{walletMessage}</p>}
           </div>
 
-          <div className="panel">
-            <span className="eyebrow">История</span>
-            <h2>Операции кошелька</h2>
-            <div className="simple-list history-list">
-              {wallet?.transactions.map((transaction) => (
-                <div className="list-card" key={transaction.id}>
-                  <div>
-                    <strong>{transaction.description}</strong>
-                    <span>{formatDateTime(transaction.created_at)}</span>
+          <div className="panel wide-panel">
+            <span className="eyebrow">Операции</span>
+            <h2>История кошелька</h2>
+            {wallet?.transactions.length ? (
+              <div className="simple-list history-list">
+                {wallet.transactions.map((transaction) => (
+                  <div className="list-card" key={transaction.id}>
+                    <div>
+                      <strong>{transaction.description || transaction.transaction_type}</strong>
+                      <span>{formatDateTime(transaction.created_at)}</span>
+                    </div>
+                    <strong className={Number(transaction.amount) >= 0 ? "text-success" : "text-danger"}>
+                      {formatMoney(transaction.amount)}
+                    </strong>
                   </div>
-                  <strong>{formatMoney(transaction.amount)}</strong>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <p className="muted">Операций пока нет</p>
+            )}
           </div>
         </section>
       )}
 
       {tab === "activity" && (
         <section className="dashboard-grid">
-          <div className="panel">
-            <span className="eyebrow">Бронь</span>
+          {activityMessage && <p className="message section-message activity-message">{activityMessage}</p>}
+          <div className={`panel ${adminBooking ? "booking-activity-panel" : ""}`}>
+            <span className="eyebrow">Бронирование</span>
             <h2>Активная бронь</h2>
             {adminBooking ? (
-              <div className="list-card">
-                <div>
-                  <strong>
-                    {adminBooking.car.brand} {adminBooking.car.model}
-                  </strong>
-                  <span>{adminBooking.car.license_plate}</span>
+              <>
+                <p className="panel-title">
+                  {adminBooking.car.brand} {adminBooking.car.model}
+                </p>
+                <p className="helper-text">Бронь действует 15 минут, затем снимается автоматически</p>
+                <p className="big-number">
+                  {bookingSecondsLeft !== null ? formatCountdown(bookingSecondsLeft) : "0 мин 00 сек"}
+                </p>
+                <div className="button-row">
+                  <button className="ghost-button" type="button" onClick={() => setTab("map")}>
+                    Открыть на карте
+                  </button>
+                  <button
+                    className="secondary-button"
+                    type="button"
+                    onClick={() =>
+                      void runServiceAction(
+                        () => api.cancelBooking(token, adminBooking.id),
+                        "Бронирование отменено",
+                        setActivityMessage,
+                      )
+                    }
+                  >
+                    Отменить бронь
+                  </button>
                 </div>
-                <button
-                  className="ghost-button"
-                  type="button"
-                  onClick={() => void runAction(() => api.cancelBooking(token, adminBooking.id), "Бронь отменена")}
-                >
-                  Отменить
-                </button>
-              </div>
+              </>
             ) : (
-              <p className="muted">Активной брони нет</p>
+              <p className="muted">Сейчас нет активной брони</p>
             )}
           </div>
 
-          <div className={`panel ${adminTrips.active ? "trip-activity-panel" : ""}`}>
+          <div className={`panel ${activeTrip ? "trip-activity-panel" : ""}`}>
             <span className="eyebrow">Поездка</span>
             <h2>Активная поездка</h2>
-            {adminTrips.active ? (
-              <div className="list-card">
-                <div>
-                  <strong>
-                    {adminTrips.active.car.brand} {adminTrips.active.car.model}
-                  </strong>
-                  <span>Начата: {formatDateTime(adminTrips.active.started_at)}</span>
+            {activeTrip ? (
+              <>
+                <p className="panel-title">
+                  {activeTrip.car.brand} {activeTrip.car.model}
+                </p>
+                <div className="button-row">
+                  <button className="ghost-button" type="button" onClick={() => setTab("map")}>
+                    Вернуться к карте
+                  </button>
+                  <button className="primary-button" type="button" onClick={() => handleFinishTrip(setActivityMessage)}>
+                    Завершить поездку
+                  </button>
                 </div>
-              </div>
+              </>
             ) : (
               <p className="muted">Активной поездки нет</p>
+            )}
+          </div>
+
+          <div className="panel wide-panel">
+            <span className="eyebrow">История</span>
+            <h2>История поездок</h2>
+            {history.length ? (
+              <div className="simple-list history-list">
+                {history.map((trip) => (
+                  <div className="list-card" key={trip.id}>
+                    <div>
+                      <strong>
+                        {trip.car.brand} {trip.car.model}
+                      </strong>
+                      <span>
+                        {formatDateTime(trip.started_at)} • {trip.total_minutes} мин
+                      </span>
+                    </div>
+                    <strong>{formatMoney(trip.total_price)}</strong>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="muted">История поездок пока пустая</p>
             )}
           </div>
         </section>
@@ -1538,7 +1879,7 @@ function AdminDashboard({ token, user, onLogout }: { token: string; user: User; 
           <div className="panel">
             <span className="eyebrow">Пользователи</span>
             <h2>Список пользователей</h2>
-            <div className="simple-list">
+            <div className="simple-list section-content-offset">
               {adminUsers.map((item) => (
                 <div className="application-card" key={item.id}>
                   <div>
@@ -1546,21 +1887,6 @@ function AdminDashboard({ token, user, onLogout }: { token: string; user: User; 
                     <span>{item.email}</span>
                     <span>Телефон: {item.phone}</span>
                     <span>Статус заявки: {item.verification_status}</span>
-                    <span>{item.is_blocked ? "Пользователь заблокирован" : "Пользователь активен"}</span>
-                  </div>
-                  <div className="button-row">
-                    <button
-                      className="ghost-button"
-                      type="button"
-                      onClick={() =>
-                        void runAction(
-                          () => api.adminUserAction(token, item.id, item.is_blocked ? "unblock" : "block"),
-                          item.is_blocked ? "Пользователь разблокирован" : "Пользователь заблокирован",
-                        )
-                      }
-                    >
-                      {item.is_blocked ? "Разблокировать" : "Заблокировать"}
-                    </button>
                   </div>
                 </div>
               ))}
@@ -1574,7 +1900,7 @@ function AdminDashboard({ token, user, onLogout }: { token: string; user: User; 
           <div className="panel wide-panel">
             <span className="eyebrow">Автомобили</span>
             <h2>Список автопарка</h2>
-            <div className="simple-list">
+            <div className="simple-list section-content-offset">
               {cars.map((car) => (
                 <div className="list-card" key={car.id}>
                   <div>
@@ -1639,7 +1965,7 @@ function AdminDashboard({ token, user, onLogout }: { token: string; user: User; 
           <div className="panel">
             <span className="eyebrow">Брони</span>
             <h2>Все бронирования</h2>
-            <div className="simple-list">
+            <div className="simple-list section-content-offset">
               {allBookings.map((bookingItem) => (
                 <div className="list-card" key={bookingItem.id}>
                   <div>
@@ -1662,7 +1988,7 @@ function AdminDashboard({ token, user, onLogout }: { token: string; user: User; 
           <div className="panel">
             <span className="eyebrow">Поездки</span>
             <h2>Все поездки</h2>
-            <div className="simple-list">
+            <div className="simple-list section-content-offset">
               {allTrips.map((trip) => (
                 <div className="list-card" key={trip.id}>
                   <div>
@@ -1691,7 +2017,7 @@ function AdminDashboard({ token, user, onLogout }: { token: string; user: User; 
             {pendingUsers.length === 0 ? (
               <p className="muted">Новых заявок сейчас нет</p>
             ) : (
-              <div className="simple-list">
+              <div className="simple-list section-content-offset">
                 {pendingUsers.map((item) => (
                   <div className="application-card" key={item.id}>
                     <div>
@@ -1824,7 +2150,7 @@ function AdminDashboard({ token, user, onLogout }: { token: string; user: User; 
           <div className="panel">
             <span className="eyebrow">Список</span>
             <h2>Все зоны</h2>
-            <div className="simple-list">
+            <div className="simple-list section-content-offset">
               {bonusZones.map((zone) => (
                 <div className="list-card" key={zone.id}>
                   <div>
@@ -1861,32 +2187,34 @@ function AdminDashboard({ token, user, onLogout }: { token: string; user: User; 
           <div className="panel">
             <span className="eyebrow">Тариф</span>
             <h2>Настройки поездок</h2>
-            <label>
-              Минимальный баланс
-              <input
-                value={tariff?.min_start_balance ?? ""}
-                onChange={(event) =>
-                  setTariff((value) => (value ? { ...value, min_start_balance: event.target.value } : value))
+            <div className="form-stack section-content-offset">
+              <label>
+                Минимальный баланс
+                <input
+                  value={tariff?.min_start_balance ?? ""}
+                  onChange={(event) =>
+                    setTariff((value) => (value ? { ...value, min_start_balance: event.target.value } : value))
+                  }
+                />
+              </label>
+              <button
+                className="primary-button"
+                type="button"
+                disabled={!tariff}
+                onClick={() =>
+                  tariff &&
+                  void runAction(
+                    () =>
+                      api.adminUpdateTariff(token, {
+                        min_start_balance: tariff.min_start_balance,
+                      }),
+                    "Тариф сохранен",
+                  )
                 }
-              />
-            </label>
-            <button
-              className="primary-button"
-              type="button"
-              disabled={!tariff}
-              onClick={() =>
-                tariff &&
-                void runAction(
-                  () =>
-                    api.adminUpdateTariff(token, {
-                      min_start_balance: tariff.min_start_balance,
-                    }),
-                  "Тариф сохранен",
-                )
-              }
-            >
-              Сохранить тариф
-            </button>
+              >
+                Сохранить тариф
+              </button>
+            </div>
           </div>
 
           <div className="panel">
@@ -1896,7 +2224,7 @@ function AdminDashboard({ token, user, onLogout }: { token: string; user: User; 
               Цена поездки считается как минуты поездки, умноженные на цену выбранной машины и коэффициент времени
               старта. Коэффициент фиксируется при начале поездки
             </p>
-            <div className="simple-list">
+            <div className="simple-list section-content-offset">
               {coefficients.map((coefficient) => (
                 <div className="list-card" key={coefficient.id}>
                   <div>
@@ -1909,7 +2237,7 @@ function AdminDashboard({ token, user, onLogout }: { token: string; user: User; 
                 </div>
               ))}
             </div>
-            <form className="form-stack" onSubmit={handleCreateCoefficient}>
+            <form className="form-stack section-content-offset" onSubmit={handleCreateCoefficient}>
               <input
                 placeholder="Название коэффициента"
                 value={coefficientForm.name}
@@ -1945,6 +2273,7 @@ function AdminDashboard({ token, user, onLogout }: { token: string; user: User; 
       )}
 
       {message && <p className="message fixed-message">{message}</p>}
+      {isRefreshing && <p className="loading-banner">Синхронизируем карту, бронь и поездки...</p>}
     </main>
   );
 }

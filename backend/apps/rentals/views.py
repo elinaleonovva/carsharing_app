@@ -213,10 +213,6 @@ class AdminUserActionAPIView(APIView):
             user.is_blocked = False
         elif action == "reject":
             user.verification_status = User.VerificationStatus.REJECTED
-        elif action == "block":
-            user.is_blocked = True
-        elif action == "unblock":
-            user.is_blocked = False
 
         user.save(update_fields=["verification_status", "is_blocked"])
         return Response(AdminUserSerializer(user).data)
