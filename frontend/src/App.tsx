@@ -545,8 +545,8 @@ function WaitingScreen({ user, onLogout }: { user: User; onLogout: () => void })
         <h2>{isRejected ? "Заявка отклонена" : "Заявка отправлена"}</h2>
         <p>
           {isRejected
-            ? "Администратор отклонил заявку. Проверьте данные и попробуйте снова."
-            : "Как только администратор подтвердит аккаунт, откроется доступ к карте, кошельку и поездкам."}
+            ? "Администратор отклонил заявку. Проверьте данные и попробуйте снова"
+            : "Как только администратор подтвердит аккаунт, откроется доступ к карте, кошельку и поездкам"}
         </p>
         <button className="ghost-button" type="button" onClick={onLogout}>
           Выйти
@@ -571,7 +571,9 @@ function UserDashboard({ token, user, onLogout }: { token: string; user: User; o
     durationMinutes: null,
   });
   const [topUpAmount, setTopUpAmount] = useState("500");
-  const [message, setMessage] = useState("");
+  const [mapMessage, setMapMessage] = useState("");
+  const [walletMessage, setWalletMessage] = useState("");
+  const [activityMessage, setActivityMessage] = useState("");
   const [now, setNow] = useState(Date.now());
   const [isRefreshing, setIsRefreshing] = useState(true);
 
@@ -584,10 +586,6 @@ function UserDashboard({ token, user, onLogout }: { token: string; user: User; o
   const activeTripStart = activeTrip ? getCarCoords(activeTrip.car) : null;
   const estimatedTripPrice = calculateEstimatedTripPrice(activeTrip, destinationRouteSummary.durationMinutes);
   const bookingSecondsLeft = getBookingSecondsLeft(booking, now);
-  const activeTripSeconds = activeTrip
-    ? Math.max(0, Math.floor((now - new Date(activeTrip.started_at).getTime()) / 1000))
-    : 0;
-
   const loadData = async (showLoader = false) => {
     if (showLoader) {
       setIsRefreshing(true);
@@ -619,9 +617,8 @@ function UserDashboard({ token, user, onLogout }: { token: string; user: User; o
 
         return null;
       });
-      setMessage("");
     } catch (error) {
-      setMessage(getErrorMessage(error));
+      setMapMessage(getErrorMessage(error));
     } finally {
       if (showLoader) {
         setIsRefreshing(false);
@@ -652,52 +649,57 @@ function UserDashboard({ token, user, onLogout }: { token: string; user: User; o
     }
   }, [booking, bookingSecondsLeft]);
 
-  const runAction = async (action: () => Promise<unknown>, successText: string) => {
-    setMessage("");
+  const runAction = async (
+    action: () => Promise<unknown>,
+    successText: string,
+    setSectionMessage: (message: string) => void,
+  ) => {
+    setSectionMessage("");
 
     try {
       await action();
       await loadData();
-      setMessage(successText);
+      setSectionMessage(successText);
     } catch (error) {
-      setMessage(getErrorMessage(error));
+      setSectionMessage(getErrorMessage(error));
     }
   };
 
   const handleBookSelectedCar = () => {
     if (hasDebt) {
-      setMessage("Сначала погасите задолженность в кошельке.");
+      setMapMessage("Сначала погасите задолженность в кошельке");
       return;
     }
 
     if (!selectedCar) {
-      setMessage("Сначала выберите машину на карте.");
+      setMapMessage("Сначала выберите машину на карте");
       return;
     }
 
     void runAction(
       () => api.createBooking(token, selectedCar.id),
-      "Машина забронирована на 15 минут.",
+      "Машина забронирована на 15 минут",
+      setMapMessage,
     );
   };
 
   const handleStartTrip = () => {
     if (hasDebt) {
-      setMessage("Сначала погасите задолженность в кошельке.");
+      setMapMessage("Сначала погасите задолженность в кошельке");
       return;
     }
 
     if (!selectedCar) {
-      setMessage("Сначала выберите машину на карте.");
+      setMapMessage("Сначала выберите машину на карте");
       return;
     }
 
     if (!userLocation) {
-      setMessage("Сначала поставьте свою точку на карте.");
+      setMapMessage("Сначала поставьте свою точку на карте");
       return;
     }
 
-    setMessage("");
+    setMapMessage("");
     void api
       .startTrip(token, selectedCar.id, toApiCoordinate(userLocation[0]), toApiCoordinate(userLocation[1]))
       .then(async () => {
@@ -705,9 +707,9 @@ function UserDashboard({ token, user, onLogout }: { token: string; user: User; o
         setDestinationLocation(null);
         setDestinationRouteSummary({ distanceKm: null, durationMinutes: null });
         await loadData();
-        setMessage("Поездка началась. Теперь поставьте точку назначения на карте.");
+        setMapMessage("Поездка началась. Теперь поставьте точку назначения на карте");
       })
-      .catch((error) => setMessage(getErrorMessage(error)));
+      .catch((error) => setMapMessage(getErrorMessage(error)));
   };
 
   const handleDestinationChange = (coords: Coordinates) => {
@@ -721,19 +723,19 @@ function UserDashboard({ token, user, onLogout }: { token: string; user: User; o
       .setTripDestination(token, activeTrip.id, toApiCoordinate(coords[0]), toApiCoordinate(coords[1]))
       .then((trip) => {
         setActiveTrip(trip);
-        setMessage("");
+        setMapMessage("");
       })
-      .catch((error) => setMessage(getErrorMessage(error)));
+      .catch((error) => setMapMessage(getErrorMessage(error)));
   };
 
-  const handleFinishTrip = () => {
+  const handleFinishTrip = (setSectionMessage = setMapMessage) => {
     if (!activeTrip) {
-      setMessage("Активной поездки нет.");
+      setSectionMessage("Активной поездки нет");
       return;
     }
 
     if (!destinationLocation) {
-      setMessage("Перед завершением поставьте точку назначения на карте.");
+      setSectionMessage("Перед завершением поставьте точку назначения на карте");
       return;
     }
 
@@ -746,12 +748,19 @@ function UserDashboard({ token, user, onLogout }: { token: string; user: User; o
           toApiCoordinate(destinationLocation[1]),
           destinationRouteSummary.durationMinutes ?? undefined,
         ),
-      "Поездка завершена.",
+      "Поездка завершена",
+      setSectionMessage,
     );
   };
 
   const bookingBelongsToSelectedCar = booking?.car.id === selectedCar?.id;
   const bookingBelongsToAnotherCar = Boolean(booking && selectedCar && booking.car.id !== selectedCar.id);
+  const handleTabChange = (nextTab: UserTab) => {
+    setTab(nextTab);
+    if (nextTab === "map") setMapMessage("");
+    if (nextTab === "wallet") setWalletMessage("");
+    if (nextTab === "activity") setActivityMessage("");
+  };
 
   return (
     <main className="dashboard-page">
@@ -767,7 +776,7 @@ function UserDashboard({ token, user, onLogout }: { token: string; user: User; o
 
       <TabBar<UserTab>
         value={tab}
-        onChange={setTab}
+        onChange={handleTabChange}
         items={[
           { value: "map", label: "Карта" },
           { value: "wallet", label: "Кошелек" },
@@ -792,7 +801,7 @@ function UserDashboard({ token, user, onLogout }: { token: string; user: User; o
 
           <div className="panel map-panel">
             <div className="map-stage">
-              {message && <p className="message map-message">{message}</p>}
+              {mapMessage && <p className="message map-message">{mapMessage}</p>}
               <FleetMap
                 cars={cars}
                 selectedCarId={selectedCarId}
@@ -812,7 +821,7 @@ function UserDashboard({ token, user, onLogout }: { token: string; user: User; o
                   <h3>
                     {activeTrip.car.brand} {activeTrip.car.model}
                   </h3>
-                  <p className="popup-lead">Поставьте на карте точку назначения.</p>
+                  <p className="popup-lead">Поставьте на карте точку назначения</p>
                   <div className="detail-list">
                     <div>
                       <span>Цена машины</span>
@@ -845,7 +854,7 @@ function UserDashboard({ token, user, onLogout }: { token: string; user: User; o
                     className="primary-button"
                     type="button"
                     disabled={!destinationLocation || destinationRouteSummary.durationMinutes === null}
-                    onClick={handleFinishTrip}
+                    onClick={() => handleFinishTrip(setMapMessage)}
                   >
                     Завершить поездку
                   </button>
@@ -853,7 +862,7 @@ function UserDashboard({ token, user, onLogout }: { token: string; user: User; o
               )}
 
               {!activeTrip && selectedCar && (
-                <aside className="map-popup">
+                <aside className="map-popup car-popup">
                   <button
                     className="map-popup-close"
                     type="button"
@@ -917,17 +926,17 @@ function UserDashboard({ token, user, onLogout }: { token: string; user: User; o
                   </div>
                   {!userLocation && (
                     <p className="inline-note">
-                      Чтобы начать поездку, поставьте свою точку на карте.
+                      Чтобы начать поездку, поставьте свою точку на карте
                     </p>
                   )}
                   {hasDebt && (
                     <p className="inline-note">
-                      Есть задолженность. Пополните кошелек, чтобы снова бронировать и начинать поездки.
+                      Есть задолженность. Пополните кошелек, чтобы снова бронировать и начинать поездки
                     </p>
                   )}
                   {bookingBelongsToAnotherCar && (
                     <p className="inline-note">
-                      У вас уже есть активная бронь на другую машину. Сначала отмените ее в разделе активности.
+                      У вас уже есть активная бронь на другую машину. Сначала отмените ее в разделе активности
                     </p>
                   )}
                 </aside>
@@ -943,16 +952,12 @@ function UserDashboard({ token, user, onLogout }: { token: string; user: User; o
             <span className="eyebrow">Баланс</span>
             <h2>Кошелек</h2>
             <p className="big-number">{formatMoney(wallet?.balance ?? user.balance)}</p>
-            <p className="helper-text">
-              Баланс используется для старта поездок и оплаты итоговой стоимости. Если баланс ушел в минус, это долг:
-              новые брони и поездки будут недоступны до пополнения.
-            </p>
             {hasDebt && (
               <p className="inline-note">
-                Сейчас есть задолженность {formatMoney(Math.abs(Number(wallet?.balance ?? user.balance)))}.
+                Сейчас есть задолженность {formatMoney(Math.abs(Number(wallet?.balance ?? user.balance)))}
               </p>
             )}
-            <div className="inline-form">
+            <div className="inline-form wallet-top-up-form">
               <input
                 value={topUpAmount}
                 onChange={(event) => setTopUpAmount(event.target.value)}
@@ -964,19 +969,20 @@ function UserDashboard({ token, user, onLogout }: { token: string; user: User; o
                 className="primary-button"
                 type="button"
                 onClick={() =>
-                  void runAction(() => api.topUp(token, topUpAmount), "Баланс успешно пополнен.")
+                  void runAction(() => api.topUp(token, topUpAmount), "Баланс успешно пополнен", setWalletMessage)
                 }
               >
                 Пополнить
               </button>
             </div>
+            {walletMessage && <p className="message section-message wallet-message">{walletMessage}</p>}
           </div>
 
           <div className="panel wide-panel">
             <span className="eyebrow">Операции</span>
             <h2>История кошелька</h2>
             {wallet?.transactions.length ? (
-              <div className="simple-list">
+              <div className="simple-list history-list">
                 {wallet.transactions.map((transaction) => (
                   <div className="list-card" key={transaction.id}>
                     <div>
@@ -990,7 +996,7 @@ function UserDashboard({ token, user, onLogout }: { token: string; user: User; o
                 ))}
               </div>
             ) : (
-              <p className="muted">Операций пока нет.</p>
+              <p className="muted">Операций пока нет</p>
             )}
           </div>
         </section>
@@ -998,7 +1004,8 @@ function UserDashboard({ token, user, onLogout }: { token: string; user: User; o
 
       {tab === "activity" && (
         <section className="dashboard-grid">
-          <div className="panel">
+          {activityMessage && <p className="message section-message activity-message">{activityMessage}</p>}
+          <div className={`panel ${booking ? "booking-activity-panel" : ""}`}>
             <span className="eyebrow">Бронирование</span>
             <h2>Активная бронь</h2>
             {booking ? (
@@ -1006,7 +1013,7 @@ function UserDashboard({ token, user, onLogout }: { token: string; user: User; o
                 <p className="panel-title">
                   {booking.car.brand} {booking.car.model}
                 </p>
-                <p className="helper-text">Бронь действует 15 минут, затем снимается автоматически.</p>
+                <p className="helper-text">Бронь действует 15 минут, затем снимается автоматически</p>
                 <p className="big-number">
                   {bookingSecondsLeft !== null ? formatCountdown(bookingSecondsLeft) : "0 мин 00 сек"}
                 </p>
@@ -1020,7 +1027,8 @@ function UserDashboard({ token, user, onLogout }: { token: string; user: User; o
                     onClick={() =>
                       void runAction(
                         () => api.cancelBooking(token, booking.id),
-                        "Бронирование отменено.",
+                        "Бронирование отменено",
+                        setActivityMessage,
                       )
                     }
                   >
@@ -1029,7 +1037,7 @@ function UserDashboard({ token, user, onLogout }: { token: string; user: User; o
                 </div>
               </>
             ) : (
-              <p className="muted">Сейчас нет активной брони.</p>
+              <p className="muted">Сейчас нет активной брони</p>
             )}
           </div>
 
@@ -1041,19 +1049,17 @@ function UserDashboard({ token, user, onLogout }: { token: string; user: User; o
                 <p className="panel-title">
                   {activeTrip.car.brand} {activeTrip.car.model}
                 </p>
-                <p className="helper-text">На карте поставьте точку назначения: маршрут и примерная стоимость появятся автоматически.</p>
-                <p className="big-number">{formatDuration(activeTripSeconds)}</p>
                 <div className="button-row">
                   <button className="ghost-button" type="button" onClick={() => setTab("map")}>
                     Вернуться к карте
                   </button>
-                  <button className="primary-button" type="button" onClick={handleFinishTrip}>
+                  <button className="primary-button" type="button" onClick={() => handleFinishTrip(setActivityMessage)}>
                     Завершить поездку
                   </button>
                 </div>
               </>
             ) : (
-              <p className="muted">Активной поездки нет.</p>
+              <p className="muted">Активной поездки нет</p>
             )}
           </div>
 
@@ -1061,7 +1067,7 @@ function UserDashboard({ token, user, onLogout }: { token: string; user: User; o
             <span className="eyebrow">История</span>
             <h2>История поездок</h2>
             {history.length ? (
-              <div className="simple-list">
+              <div className="simple-list history-list">
                 {history.map((trip) => (
                   <div className="list-card" key={trip.id}>
                     <div>
@@ -1077,13 +1083,12 @@ function UserDashboard({ token, user, onLogout }: { token: string; user: User; o
                 ))}
               </div>
             ) : (
-              <p className="muted">История поездок пока пустая.</p>
+              <p className="muted">История поездок пока пустая</p>
             )}
           </div>
         </section>
       )}
 
-      {tab !== "map" && message && <p className="message fixed-message">{message}</p>}
       {isRefreshing && <p className="loading-banner">Синхронизируем карту, бронь и поездки...</p>}
     </main>
   );
@@ -1146,7 +1151,7 @@ function AdminDashboard({ token, user, onLogout }: { token: string; user: User; 
 
   const handleCreateCar = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    void runAction(() => api.adminCreateCar(token, carForm), "Автомобиль добавлен в автопарк.").then(
+    void runAction(() => api.adminCreateCar(token, carForm), "Автомобиль добавлен в автопарк").then(
       () => setCarForm(initialCarForm),
     );
   };
@@ -1157,7 +1162,7 @@ function AdminDashboard({ token, user, onLogout }: { token: string; user: User; 
         <div>
           <span className="eyebrow">Администратор</span>
           <h1>{user.email}</h1>
-          <p className="topbar-note">Разделы автопарка, заявок и тарифов вынесены в отдельные SPA-вкладки.</p>
+          <p className="topbar-note">Разделы автопарка, заявок и тарифов вынесены в отдельные SPA-вкладки</p>
         </div>
         <button className="ghost-button" type="button" onClick={onLogout}>
           Выйти
@@ -1288,10 +1293,10 @@ function AdminDashboard({ token, user, onLogout }: { token: string; user: User; 
             <h2>Работа с картой</h2>
             <p className="helper-text">
               Клик по маркеру машины открывает карточку справа. Через нее можно менять статус без отдельного
-              списка всех автомобилей.
+              списка всех автомобилей
             </p>
             <p className="helper-text">
-              Для отображения карты в админке используется тот же ключ Яндекс Карт, что и в пользовательской части.
+              Для отображения карты в админке используется тот же ключ Яндекс Карт, что и в пользовательской части
             </p>
           </div>
         </section>
@@ -1303,7 +1308,7 @@ function AdminDashboard({ token, user, onLogout }: { token: string; user: User; 
             <span className="eyebrow">Модерация</span>
             <h2>Заявки пользователей</h2>
             {pendingUsers.length === 0 ? (
-              <p className="muted">Новых заявок сейчас нет.</p>
+              <p className="muted">Новых заявок сейчас нет</p>
             ) : (
               <div className="simple-list">
                 {pendingUsers.map((item) => (
@@ -1321,7 +1326,7 @@ function AdminDashboard({ token, user, onLogout }: { token: string; user: User; 
                         onClick={() =>
                           void runAction(
                             () => api.adminUserAction(token, item.id, "approve"),
-                            "Заявка одобрена.",
+                            "Заявка одобрена",
                           )
                         }
                       >
@@ -1333,7 +1338,7 @@ function AdminDashboard({ token, user, onLogout }: { token: string; user: User; 
                         onClick={() =>
                           void runAction(
                             () => api.adminUserAction(token, item.id, "reject"),
-                            "Заявка отклонена.",
+                            "Заявка отклонена",
                           )
                         }
                       >
@@ -1373,7 +1378,7 @@ function AdminDashboard({ token, user, onLogout }: { token: string; user: User; 
                     api.adminUpdateTariff(token, {
                       min_start_balance: tariff.min_start_balance,
                     }),
-                  "Тариф сохранен.",
+                  "Тариф сохранен",
                 )
               }
             >
@@ -1386,7 +1391,7 @@ function AdminDashboard({ token, user, onLogout }: { token: string; user: User; 
             <h2>Коэффициенты времени</h2>
             <p className="helper-text">
               Цена поездки считается как минуты поездки, умноженные на цену выбранной машины и коэффициент времени
-              старта. Коэффициент фиксируется при начале поездки.
+              старта. Коэффициент фиксируется при начале поездки
             </p>
             <div className="simple-list">
               {coefficients.map((coefficient) => (
@@ -1579,7 +1584,7 @@ function FleetMap({
         {
           hintContent: "Моя точка",
           balloonContentHeader: "Моя точка",
-          balloonContentBody: "Отсюда строится маршрут до выбранной машины.",
+          balloonContentBody: "Отсюда строится маршрут до выбранной машины",
         },
         {
           preset: "islands#redCircleDotIcon",
@@ -1614,7 +1619,7 @@ function FleetMap({
         {
           hintContent: "Точка назначения",
           balloonContentHeader: "Точка назначения",
-          balloonContentBody: "Сюда строится маршрут текущей поездки.",
+          balloonContentBody: "Сюда строится маршрут текущей поездки",
         },
         {
           preset: "islands#redFlagIcon",

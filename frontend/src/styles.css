@@ -195,6 +195,17 @@ label {
   font-weight: 700;
 }
 
+input[type="number"] {
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  margin: 0;
+  -webkit-appearance: none;
+}
+
 .primary-button,
 .secondary-button,
 .ghost-button {
@@ -250,6 +261,20 @@ button:disabled {
   background: #fff4d9;
   color: #59330c;
   box-shadow: 0 18px 44px rgba(91, 50, 8, 0.18);
+}
+
+.section-message {
+  width: 100%;
+  margin: 14px 0 0;
+  border-color: rgba(31, 122, 94, 0.18);
+  background: rgba(232, 248, 240, 0.92);
+  color: #1f5f4b;
+  box-shadow: none;
+}
+
+.activity-message {
+  grid-column: 1 / -1;
+  margin-top: 0;
 }
 
 .loading-banner {
@@ -450,6 +475,10 @@ button:disabled {
   align-items: center;
 }
 
+.wallet-top-up-form {
+  margin-top: 16px;
+}
+
 .map-panel {
   padding: 0;
   overflow: hidden;
@@ -535,7 +564,16 @@ button:disabled {
 }
 
 .map-popup h3 {
+  margin: 0;
   padding-right: 36px;
+}
+
+.car-popup {
+  gap: 8px;
+}
+
+.car-popup .popup-lead {
+  margin-top: -4px;
 }
 
 .admin-popup {
@@ -555,6 +593,19 @@ button:disabled {
 
 .detail-list {
   gap: 12px;
+}
+
+.history-list {
+  margin-top: 14px;
+}
+
+.booking-activity-panel {
+  display: grid;
+  gap: 16px;
+}
+
+.booking-activity-panel .button-row {
+  margin-top: 4px;
 }
 
 .detail-list div {
