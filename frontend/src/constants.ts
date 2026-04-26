@@ -37,6 +37,7 @@ export const initialAuthForm: AuthForm = {
 };
 
 export const initialCarForm: CarForm = {
+  id: "",
   brand: "",
   model: "",
   license_plate: "",
@@ -44,6 +45,7 @@ export const initialCarForm: CarForm = {
   latitude: "55.751244",
   longitude: "37.618423",
   price_per_minute: "12.00",
+  created_at: "",
 };
 
 export const initialBonusZoneForm: BonusZoneForm = {

@@ -32,6 +32,7 @@ export type Car = {
   latitude: string;
   longitude: string;
   price_per_minute: string;
+  created_at: string;
 };
 
 export type Booking = {

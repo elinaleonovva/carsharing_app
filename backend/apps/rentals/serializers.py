@@ -33,7 +33,9 @@ class CarSerializer(serializers.ModelSerializer):
             "latitude",
             "longitude",
             "price_per_minute",
+            "created_at",
         )
+        read_only_fields = ("id", "status_label", "created_at")
 
 
 class BookingSerializer(serializers.ModelSerializer):

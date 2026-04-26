@@ -27,6 +27,7 @@ type AuthForm = {
 };
 
 type CarForm = {
+  id: string;
   brand: string;
   model: string;
   license_plate: string;
@@ -34,6 +35,7 @@ type CarForm = {
   latitude: string;
   longitude: string;
   price_per_minute: string;
+  created_at: string;
 };
 
 type BonusZoneForm = {
@@ -104,6 +106,7 @@ const initialAuthForm: AuthForm = {
 };
 
 const initialCarForm: CarForm = {
+  id: "",
   brand: "",
   model: "",
   license_plate: "",
@@ -111,6 +114,7 @@ const initialCarForm: CarForm = {
   latitude: "55.751244",
   longitude: "37.618423",
   price_per_minute: "12.00",
+  created_at: "",
 };
 
 const initialBonusZoneForm: BonusZoneForm = {
@@ -850,7 +854,7 @@ function UserDashboard({ token, user, onLogout }: { token: string; user: User; o
       />
 
       {tab === "map" && (
-        <section className="dashboard-stack">
+        <section className="dashboard-stack map-layout">
           <div className="panel hero-panel">
             <div className="hero-row">
               <div>
@@ -912,7 +916,7 @@ function UserDashboard({ token, user, onLogout }: { token: string; user: User; o
                       </strong>
                     </div>
                     <div>
-                      <span>Примерно</span>
+                      <span>Итог</span>
                       <strong>{estimatedTripPrice ? formatMoney(estimatedTripPrice) : "После выбора точки"}</strong>
                     </div>
                   </div>
@@ -990,17 +994,17 @@ function UserDashboard({ token, user, onLogout }: { token: string; user: User; o
                       {activeTrip ? "Поездка уже идет" : "Начать поездку"}
                     </button>
                   </div>
-                  {!userLocation && (
-                    <p className="inline-note">
-                      Чтобы начать поездку, поставьте свою точку на карте
-                    </p>
-                  )}
                   {hasDebt && (
                     <p className="inline-note">
                       Есть задолженность. Пополните кошелек, чтобы снова бронировать и начинать поездки
                     </p>
                   )}
-                  {bookingBelongsToAnotherCar && (
+                  {!hasDebt && !userLocation && (
+                    <p className="inline-note">
+                      Чтобы начать поездку, поставьте свою точку на карте
+                    </p>
+                  )}
+                  {!hasDebt && userLocation && bookingBelongsToAnotherCar && (
                     <p className="inline-note">
                       У вас уже есть активная бронь на другую машину. Сначала отмените ее в разделе активности
                     </p>
@@ -1013,7 +1017,7 @@ function UserDashboard({ token, user, onLogout }: { token: string; user: User; o
       )}
 
       {tab === "wallet" && (
-        <section className="dashboard-grid">
+        <section className="dashboard-grid wallet-layout">
           <div className="panel">
             <span className="eyebrow">Баланс</span>
             <h2>Кошелек</h2>
@@ -1069,7 +1073,7 @@ function UserDashboard({ token, user, onLogout }: { token: string; user: User; o
       )}
 
       {tab === "activity" && (
-        <section className="dashboard-grid">
+        <section className="dashboard-grid activity-layout">
           {activityMessage && <p className="message section-message activity-message">{activityMessage}</p>}
           <div className={`panel ${booking ? "booking-activity-panel" : ""}`}>
             <span className="eyebrow">Бронирование</span>
@@ -1321,8 +1325,10 @@ function AdminDashboard({ token, user, onLogout }: { token: string; user: User; 
       await action();
       await loadAdminData();
       setMessage(successText);
+      return true;
     } catch (error) {
       setMessage(getErrorMessage(error));
+      return false;
     }
   };
 
@@ -1455,30 +1461,42 @@ function AdminDashboard({ token, user, onLogout }: { token: string; user: User; 
     if (nextTab === "activity") setActivityMessage("");
   };
 
-  const handleCreateCar = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    void runAction(() => api.adminCreateCar(token, carForm), "Автомобиль добавлен в автопарк").then(
-      () => setCarForm(initialCarForm),
-    );
+  const buildCarPayload = () => ({
+    brand: carForm.brand,
+    model: carForm.model,
+    license_plate: carForm.license_plate,
+    status: carForm.status,
+    latitude: carForm.latitude,
+    longitude: carForm.longitude,
+    price_per_minute: carForm.price_per_minute,
+  });
+
+  const resetCarForm = () => {
+    setEditingCarId(null);
+    setCarForm(initialCarForm);
   };
 
-  const handleSaveCar = (event: FormEvent<HTMLFormElement>) => {
+  const handleSaveCar = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    const payload = buildCarPayload();
     const action = editingCarId
-      ? () => api.adminUpdateCar(token, editingCarId, carForm)
-      : () => api.adminCreateCar(token, carForm);
-    void runAction(action, editingCarId ? "Данные автомобиля обновлены" : "Автомобиль добавлен в автопарк").then(
-      () => {
-        setCarForm(initialCarForm);
-        setEditingCarId(null);
-      },
+      ? () => api.adminUpdateCar(token, editingCarId, payload)
+      : () => api.adminCreateCar(token, payload);
+    const isSaved = await runAction(
+      action,
+      editingCarId ? "Данные автомобиля обновлены" : "Автомобиль добавлен в автопарк",
     );
+
+    if (isSaved) {
+      resetCarForm();
+    }
   };
 
   const startEditingCar = (car: Car) => {
     setEditingCarId(car.id);
     setSelectedCarId(car.id);
     setCarForm({
+      id: String(car.id),
       brand: car.brand,
       model: car.model,
       license_plate: car.license_plate,
@@ -1486,6 +1504,7 @@ function AdminDashboard({ token, user, onLogout }: { token: string; user: User; 
       latitude: car.latitude,
       longitude: car.longitude,
       price_per_minute: car.price_per_minute,
+      created_at: car.created_at,
     });
   };
 
@@ -1569,7 +1588,7 @@ function AdminDashboard({ token, user, onLogout }: { token: string; user: User; 
       />
 
       {tab === "map" && (
-        <section className="dashboard-stack">
+        <section className="dashboard-stack map-layout">
           <div className="panel hero-panel">
             <div className="hero-row">
               <div>
@@ -1709,17 +1728,17 @@ function AdminDashboard({ token, user, onLogout }: { token: string; user: User; 
                       {activeTrip ? "Поездка уже идет" : "Начать поездку"}
                     </button>
                   </div>
-                  {!userLocation && (
-                    <p className="inline-note">
-                      Чтобы начать поездку, поставьте свою точку на карте
-                    </p>
-                  )}
                   {hasDebt && (
                     <p className="inline-note">
                       Есть задолженность. Пополните кошелек, чтобы снова бронировать и начинать поездки
                     </p>
                   )}
-                  {bookingBelongsToAnotherCar && (
+                  {!hasDebt && !userLocation && (
+                    <p className="inline-note">
+                      Чтобы начать поездку, поставьте свою точку на карте
+                    </p>
+                  )}
+                  {!hasDebt && userLocation && bookingBelongsToAnotherCar && (
                     <p className="inline-note">
                       У вас уже есть активная бронь на другую машину. Сначала отмените ее в разделе активности
                     </p>
@@ -1732,7 +1751,7 @@ function AdminDashboard({ token, user, onLogout }: { token: string; user: User; 
       )}
 
       {tab === "wallet" && (
-        <section className="dashboard-grid">
+        <section className="dashboard-grid wallet-layout">
           <div className="panel">
             <span className="eyebrow">Баланс</span>
             <h2>Кошелек</h2>
@@ -1788,7 +1807,7 @@ function AdminDashboard({ token, user, onLogout }: { token: string; user: User; 
       )}
 
       {tab === "activity" && (
-        <section className="dashboard-grid">
+        <section className="dashboard-grid activity-layout">
           {activityMessage && <p className="message section-message activity-message">{activityMessage}</p>}
           <div className={`panel ${adminBooking ? "booking-activity-panel" : ""}`}>
             <span className="eyebrow">Бронирование</span>
@@ -1925,21 +1944,50 @@ function AdminDashboard({ token, user, onLogout }: { token: string; user: User; 
             <span className="eyebrow">{editingCarId ? "Редактирование" : "Добавление"}</span>
             <h2>{editingCarId ? "Данные автомобиля" : "Новый автомобиль"}</h2>
             <form className="form-stack" onSubmit={handleSaveCar}>
-              <input placeholder="Марка" value={carForm.brand} onChange={(event) => setCarForm((form) => ({ ...form, brand: event.target.value }))} required />
-              <input placeholder="Модель" value={carForm.model} onChange={(event) => setCarForm((form) => ({ ...form, model: event.target.value }))} required />
-              <input placeholder="Госномер" value={carForm.license_plate} onChange={(event) => setCarForm((form) => ({ ...form, license_plate: event.target.value }))} required />
-              <select value={carForm.status} onChange={(event) => setCarForm((form) => ({ ...form, status: event.target.value }))}>
-                <option value="available">Доступен</option>
-                <option value="booked">Забронирован</option>
-                <option value="in_trip">В поездке</option>
-                <option value="service">На обслуживании</option>
-                <option value="inactive">Неактивен</option>
-              </select>
+              <label>
+                ID
+                <input value={carForm.id || "Будет присвоен автоматически"} disabled />
+              </label>
+              <label>
+                Марка
+                <input value={carForm.brand} onChange={(event) => setCarForm((form) => ({ ...form, brand: event.target.value }))} required />
+              </label>
+              <label>
+                Модель
+                <input value={carForm.model} onChange={(event) => setCarForm((form) => ({ ...form, model: event.target.value }))} required />
+              </label>
+              <label>
+                Госномер
+                <input value={carForm.license_plate} onChange={(event) => setCarForm((form) => ({ ...form, license_plate: event.target.value }))} required />
+              </label>
+              <label>
+                Статус
+                <select value={carForm.status} onChange={(event) => setCarForm((form) => ({ ...form, status: event.target.value }))}>
+                  <option value="available">Доступен</option>
+                  <option value="booked">Забронирован</option>
+                  <option value="in_trip">В поездке</option>
+                  <option value="service">На обслуживании</option>
+                  <option value="inactive">Неактивен</option>
+                </select>
+              </label>
               <div className="two-columns">
-                <input placeholder="Широта" value={carForm.latitude} onChange={(event) => setCarForm((form) => ({ ...form, latitude: event.target.value }))} required />
-                <input placeholder="Долгота" value={carForm.longitude} onChange={(event) => setCarForm((form) => ({ ...form, longitude: event.target.value }))} required />
+                <label>
+                  Широта
+                  <input value={carForm.latitude} onChange={(event) => setCarForm((form) => ({ ...form, latitude: event.target.value }))} required />
+                </label>
+                <label>
+                  Долгота
+                  <input value={carForm.longitude} onChange={(event) => setCarForm((form) => ({ ...form, longitude: event.target.value }))} required />
+                </label>
               </div>
-              <input placeholder="Цена за минуту" value={carForm.price_per_minute} onChange={(event) => setCarForm((form) => ({ ...form, price_per_minute: event.target.value }))} required />
+              <label>
+                Цена за минуту
+                <input value={carForm.price_per_minute} onChange={(event) => setCarForm((form) => ({ ...form, price_per_minute: event.target.value }))} required />
+              </label>
+              <label>
+                Дата создания
+                <input value={carForm.created_at ? formatDateTime(carForm.created_at) : "Создастся автоматически"} disabled />
+              </label>
               <button className="primary-button" type="submit">
                 {editingCarId ? "Сохранить" : "Добавить"}
               </button>
@@ -1947,10 +1995,7 @@ function AdminDashboard({ token, user, onLogout }: { token: string; user: User; 
                 <button
                   className="ghost-button"
                   type="button"
-                  onClick={() => {
-                    setEditingCarId(null);
-                    setCarForm(initialCarForm);
-                  }}
+                  onClick={resetCarForm}
                 >
                   Новый автомобиль
                 </button>
