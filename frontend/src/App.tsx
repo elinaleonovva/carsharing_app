@@ -50,6 +50,25 @@ type FleetMapProps = {
 const TOKEN_KEY = "carsharing_token";
 const BOOKING_TTL_MS = 15 * 60 * 1000;
 const MOSCOW_CENTER: Coordinates = [55.751244, 37.618423];
+const MKAD_POLYGON: Coordinates[] = [
+  [55.9115, 37.5450],
+  [55.9075, 37.6200],
+  [55.8950, 37.6900],
+  [55.8700, 37.7550],
+  [55.8350, 37.8050],
+  [55.7850, 37.8420],
+  [55.7300, 37.8450],
+  [55.6800, 37.8270],
+  [55.6250, 37.7900],
+  [55.5850, 37.7200],
+  [55.5710, 37.6350],
+  [55.5820, 37.5450],
+  [55.6150, 37.4650],
+  [55.6650, 37.4050],
+  [55.7350, 37.3700],
+  [55.8050, 37.3900],
+  [55.8650, 37.4550],
+];
 
 const moneyFormatter = new Intl.NumberFormat("ru-RU", {
   minimumFractionDigits: 2,
@@ -203,6 +222,23 @@ function getCoordinatesLabel(coords: Coordinates | null): string {
 
 function toApiCoordinate(value: number): string {
   return value.toFixed(6);
+}
+
+function isInsideMkad(coords: Coordinates): boolean {
+  const [lat, lon] = coords;
+  let inside = false;
+
+  for (let i = 0, j = MKAD_POLYGON.length - 1; i < MKAD_POLYGON.length; j = i++) {
+    const [latI, lonI] = MKAD_POLYGON[i];
+    const [latJ, lonJ] = MKAD_POLYGON[j];
+    const intersects = lonI > lon !== lonJ > lon && lat < ((latJ - latI) * (lon - lonI)) / (lonJ - lonI) + latI;
+
+    if (intersects) {
+      inside = !inside;
+    }
+  }
+
+  return inside;
 }
 
 function getBookingSecondsLeft(booking: Booking | null, now: number): number | null {
@@ -649,6 +685,16 @@ function UserDashboard({ token, user, onLogout }: { token: string; user: User; o
     }
   }, [booking, bookingSecondsLeft]);
 
+  const handleUserLocationChange = (coords: Coordinates) => {
+    if (!isInsideMkad(coords)) {
+      setMapMessage("Точку можно поставить только внутри МКАД");
+      return;
+    }
+
+    setUserLocation(coords);
+    setMapMessage("");
+  };
+
   const runAction = async (
     action: () => Promise<unknown>,
     successText: string,
@@ -714,6 +760,11 @@ function UserDashboard({ token, user, onLogout }: { token: string; user: User; o
 
   const handleDestinationChange = (coords: Coordinates) => {
     if (!activeTrip) {
+      return;
+    }
+
+    if (!isInsideMkad(coords)) {
+      setMapMessage("Точку назначения можно поставить только внутри МКАД");
       return;
     }
 
@@ -807,7 +858,7 @@ function UserDashboard({ token, user, onLogout }: { token: string; user: User; o
                 selectedCarId={selectedCarId}
                 onCarSelect={setSelectedCarId}
                 userLocation={activeTrip ? null : userLocation}
-                onUserLocationChange={activeTrip ? undefined : setUserLocation}
+                onUserLocationChange={activeTrip ? undefined : handleUserLocationChange}
                 routeCar={activeTrip ? null : selectedCar}
                 destinationLocation={destinationLocation}
                 onDestinationLocationChange={activeTrip ? handleDestinationChange : undefined}

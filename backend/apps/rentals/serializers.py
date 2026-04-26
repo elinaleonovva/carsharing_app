@@ -5,10 +5,17 @@ from rest_framework import serializers
 
 from apps.accounts.serializers import UserSerializer
 
+from .geo import is_inside_mkad
 from .models import Booking, Car, Tariff, TimeCoefficient, Trip, WalletTransaction
 
 
 User = get_user_model()
+
+
+def validate_mkad_coordinates(attrs):
+    if not is_inside_mkad(attrs["latitude"], attrs["longitude"]):
+        raise serializers.ValidationError("Точку можно поставить только внутри МКАД")
+    return attrs
 
 
 class CarSerializer(serializers.ModelSerializer):
@@ -72,16 +79,25 @@ class StartTripSerializer(serializers.Serializer):
     latitude = serializers.DecimalField(max_digits=9, decimal_places=6)
     longitude = serializers.DecimalField(max_digits=9, decimal_places=6)
 
+    def validate(self, attrs):
+        return validate_mkad_coordinates(attrs)
+
 
 class FinishTripSerializer(serializers.Serializer):
     latitude = serializers.DecimalField(max_digits=9, decimal_places=6)
     longitude = serializers.DecimalField(max_digits=9, decimal_places=6)
     route_duration_minutes = serializers.IntegerField(min_value=1, required=False)
 
+    def validate(self, attrs):
+        return validate_mkad_coordinates(attrs)
+
 
 class TripDestinationSerializer(serializers.Serializer):
     latitude = serializers.DecimalField(max_digits=9, decimal_places=6)
     longitude = serializers.DecimalField(max_digits=9, decimal_places=6)
+
+    def validate(self, attrs):
+        return validate_mkad_coordinates(attrs)
 
 
 class WalletTransactionSerializer(serializers.ModelSerializer):
