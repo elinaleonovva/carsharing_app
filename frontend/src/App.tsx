@@ -1455,6 +1455,7 @@ function FleetMap({
   const routeSummaryChangeRef = useRef(onRouteSummaryChange);
   const carSelectRef = useRef(onCarSelect);
   const [isLoading, setIsLoading] = useState(true);
+  const [isMapReady, setIsMapReady] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -1516,6 +1517,7 @@ function FleetMap({
         });
 
         mapRef.current = map;
+        setIsMapReady(true);
         setIsLoading(false);
       } catch (mapError) {
         if (!cancelled) {
@@ -1533,6 +1535,7 @@ function FleetMap({
         mapRef.current.destroy();
         mapRef.current = null;
       }
+      setIsMapReady(false);
     };
   }, []);
 
@@ -1540,7 +1543,7 @@ function FleetMap({
     const map = mapRef.current;
     const ymaps = ymapsRef.current;
 
-    if (!map || !ymaps) {
+    if (!map || !ymaps || !isMapReady) {
       return;
     }
 
@@ -1655,7 +1658,18 @@ function FleetMap({
 
       map.geoObjects.add(destinationRoute);
     }
-  }, [cars, destinationLocation, routeCar, routeFrom, selectedCarId, userLocation]);
+  }, [
+    cars,
+    destinationLocation?.[0],
+    destinationLocation?.[1],
+    isMapReady,
+    routeCar,
+    routeFrom?.[0],
+    routeFrom?.[1],
+    selectedCarId,
+    userLocation?.[0],
+    userLocation?.[1],
+  ]);
 
   if (!getYandexMapsApiKey()) {
     return (
