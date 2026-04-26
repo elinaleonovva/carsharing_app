@@ -63,6 +63,8 @@ export type FleetMapProps = {
   onCarSelect: (carId: number) => void;
   userLocation?: Coordinates | null;
   onUserLocationChange?: (coords: Coordinates) => void;
+  placementLocation?: Coordinates | null;
+  onPlacementLocationChange?: (coords: Coordinates) => void;
   routeCar?: Car | null;
   destinationLocation?: Coordinates | null;
   onDestinationLocationChange?: (coords: Coordinates) => void;

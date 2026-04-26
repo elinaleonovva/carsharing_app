@@ -13,6 +13,8 @@ export function FleetMap({
   onCarSelect,
   userLocation = null,
   onUserLocationChange,
+  placementLocation = null,
+  onPlacementLocationChange,
   routeCar = null,
   destinationLocation = null,
   onDestinationLocationChange,
@@ -26,6 +28,7 @@ export function FleetMap({
   const mapRef = useRef<YMapsMapInstance | null>(null);
   const ymapsRef = useRef<YMapsApi | null>(null);
   const locationChangeRef = useRef(onUserLocationChange);
+  const placementChangeRef = useRef(onPlacementLocationChange);
   const destinationChangeRef = useRef(onDestinationLocationChange);
   const bonusZoneCenterChangeRef = useRef(onBonusZoneCenterChange);
   const routeSummaryChangeRef = useRef(onRouteSummaryChange);
@@ -43,6 +46,11 @@ export function FleetMap({
       return;
     }
 
+    if (placementChangeRef.current) {
+      placementChangeRef.current(coords);
+      return;
+    }
+
     if (destinationChangeRef.current) {
       destinationChangeRef.current(coords);
       return;
@@ -54,6 +62,10 @@ export function FleetMap({
   useEffect(() => {
     locationChangeRef.current = onUserLocationChange;
   }, [onUserLocationChange]);
+
+  useEffect(() => {
+    placementChangeRef.current = onPlacementLocationChange;
+  }, [onPlacementLocationChange]);
 
   useEffect(() => {
     destinationChangeRef.current = onDestinationLocationChange;
@@ -268,6 +280,21 @@ export function FleetMap({
       map.geoObjects.add(userPlacemark);
     }
 
+    if (placementLocation) {
+      const placementPlacemark = new ymaps.Placemark(
+        placementLocation,
+        {
+          hintContent: "Позиция автомобиля",
+          balloonContentHeader: "Позиция автомобиля",
+          balloonContentBody: "Сюда будет поставлен автомобиль после сохранения формы",
+        },
+        {
+          preset: "islands#darkGreenDotIcon",
+        },
+      );
+      map.geoObjects.add(placementPlacemark);
+    }
+
     if (userLocation && routeCar) {
       const route = new ymaps.multiRouter.MultiRoute(
         {
@@ -352,6 +379,8 @@ export function FleetMap({
     routeFrom?.[0],
     routeFrom?.[1],
     selectedCarId,
+    placementLocation?.[0],
+    placementLocation?.[1],
     userLocation?.[0],
     userLocation?.[1],
   ]);

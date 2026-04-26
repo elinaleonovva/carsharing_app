@@ -58,6 +58,8 @@ type FleetMapProps = {
   onCarSelect: (carId: number) => void;
   userLocation?: Coordinates | null;
   onUserLocationChange?: (coords: Coordinates) => void;
+  placementLocation?: Coordinates | null;
+  onPlacementLocationChange?: (coords: Coordinates) => void;
   routeCar?: Car | null;
   destinationLocation?: Coordinates | null;
   onDestinationLocationChange?: (coords: Coordinates) => void;
@@ -1186,7 +1188,9 @@ function AdminDashboard({ token, user, onLogout }: { token: string; user: User; 
   const [carForm, setCarForm] = useState<CarForm>(initialCarForm);
   const [zoneForm, setZoneForm] = useState<BonusZoneForm>(initialBonusZoneForm);
   const [selectedCarId, setSelectedCarId] = useState<number | null>(null);
+  const [fleetSelectedCarId, setFleetSelectedCarId] = useState<number | null>(null);
   const [editingCarId, setEditingCarId] = useState<number | null>(null);
+  const [isPickingCarLocation, setIsPickingCarLocation] = useState(false);
   const [editingZoneId, setEditingZoneId] = useState<number | null>(null);
   const [topUpAmount, setTopUpAmount] = useState("500");
   const [userLocation, setUserLocation] = useState<Coordinates | null>(null);
@@ -1206,6 +1210,10 @@ function AdminDashboard({ token, user, onLogout }: { token: string; user: User; 
   const pendingUsers = applications;
   const activeTrip = adminTrips.active;
   const history = adminTrips.history;
+  const carPlacementLocation =
+    Number.isFinite(Number(carForm.latitude)) && Number.isFinite(Number(carForm.longitude))
+      ? ([Number(carForm.latitude), Number(carForm.longitude)] as Coordinates)
+      : null;
   const primaryBonusZone = bonusZones[0] ?? null;
   const bonusZonePreview =
     zoneForm.latitude && zoneForm.longitude && Number(zoneForm.radius_meters) > 0
@@ -1277,6 +1285,13 @@ function AdminDashboard({ token, user, onLogout }: { token: string; user: User; 
 
         return null;
       });
+      setFleetSelectedCarId((currentSelectedCarId) => {
+        if (currentSelectedCarId && carsData.some((car) => car.id === currentSelectedCarId)) {
+          return currentSelectedCarId;
+        }
+
+        return null;
+      });
       setMessage("");
     } catch (error) {
       setMessage(getErrorMessage(error));
@@ -1342,7 +1357,9 @@ function AdminDashboard({ token, user, onLogout }: { token: string; user: User; 
     try {
       await action();
       await loadAdminData();
-      setMessage(successText);
+      if (successText) {
+        setMessage(successText);
+      }
       return true;
     } catch (error) {
       setMessage(getErrorMessage(error));
@@ -1474,6 +1491,10 @@ function AdminDashboard({ token, user, onLogout }: { token: string; user: User; 
 
   const handleTabChange = (nextTab: AdminTab) => {
     setTab(nextTab);
+    setMessage("");
+    setMapMessage("");
+    setWalletMessage("");
+    setActivityMessage("");
     if (nextTab === "map") setMapMessage("");
     if (nextTab === "wallet") setWalletMessage("");
     if (nextTab === "activity") setActivityMessage("");
@@ -1499,7 +1520,22 @@ function AdminDashboard({ token, user, onLogout }: { token: string; user: User; 
 
   const resetCarForm = () => {
     setEditingCarId(null);
+    setIsPickingCarLocation(false);
     setCarForm(initialCarForm);
+  };
+
+  const handleCarLocationChange = (coords: Coordinates) => {
+    if (!isInsideMkad(coords)) {
+      setMapMessage("Автомобиль можно поставить только внутри МКАД");
+      return;
+    }
+
+    setMapMessage("");
+    setCarForm((form) => ({
+      ...form,
+      latitude: toApiCoordinate(coords[0]),
+      longitude: toApiCoordinate(coords[1]),
+    }));
   };
 
   const handleSaveCar = async (event: FormEvent<HTMLFormElement>) => {
@@ -1523,17 +1559,19 @@ function AdminDashboard({ token, user, onLogout }: { token: string; user: User; 
       : () => api.adminCreateCar(token, payload);
     const isSaved = await runAction(
       action,
-      editingCarId ? "Данные автомобиля обновлены" : "Автомобиль добавлен в автопарк",
+      editingCarId ? "" : "Автомобиль добавлен в автопарк",
     );
 
     if (isSaved) {
+      setIsPickingCarLocation(false);
       resetCarForm();
     }
   };
 
   const startEditingCar = (car: Car) => {
     setEditingCarId(car.id);
-    setSelectedCarId(car.id);
+    setIsPickingCarLocation(true);
+    setFleetSelectedCarId(car.id);
     setCarForm({
       brand: car.brand,
       model: car.model,
@@ -2103,6 +2141,16 @@ function AdminDashboard({ token, user, onLogout }: { token: string; user: User; 
                   />
                 </label>
               </div>
+              <button
+                className="ghost-button"
+                type="button"
+                onClick={() => {
+                  setIsPickingCarLocation((value) => !value);
+                  setMapMessage("");
+                }}
+              >
+                {isPickingCarLocation ? "Показать список автомобилей" : "Выбрать точку на карте"}
+              </button>
               <label>
                 Цена за минуту
                 <input
@@ -2133,29 +2181,45 @@ function AdminDashboard({ token, user, onLogout }: { token: string; user: User; 
             </form>
           </div>
 
-          <div className="panel">
-            <span className="eyebrow">Автомобили</span>
-            <h2>Список автопарка</h2>
-            <div className="simple-list section-content-offset">
-              {cars.map((car) => (
-                <div className="list-card" key={car.id}>
-                  <div>
-                    <strong>
-                      {car.brand} {car.model}
-                    </strong>
-                    <span>{car.license_plate}</span>
-                    <span>{car.status_label}</span>
-                  </div>
-                  <div className="button-row">
-                    <strong>{formatMoney(car.price_per_minute)} / мин</strong>
-                    <button className="ghost-button" type="button" onClick={() => startEditingCar(car)}>
-                      Редактировать
-                    </button>
-                  </div>
-                </div>
-              ))}
+          {isPickingCarLocation ? (
+            <div className="panel map-panel">
+              <div className="map-stage">
+                {mapMessage && <p className="message map-message">{mapMessage}</p>}
+                <FleetMap
+                  cars={cars}
+                  selectedCarId={fleetSelectedCarId}
+                  onCarSelect={setFleetSelectedCarId}
+                  placementLocation={carPlacementLocation}
+                  onPlacementLocationChange={handleCarLocationChange}
+                  bonusZones={bonusZones.filter((zone) => zone.is_active)}
+                />
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="panel">
+              <span className="eyebrow">Автомобили</span>
+              <h2>Список автопарка</h2>
+              <div className="simple-list section-content-offset">
+                {cars.map((car) => (
+                  <div className="list-card" key={car.id}>
+                    <div>
+                      <strong>
+                        {car.brand} {car.model}
+                      </strong>
+                      <span>{car.license_plate}</span>
+                      <span>{car.status_label}</span>
+                    </div>
+                    <div className="button-row">
+                      <strong>{formatMoney(car.price_per_minute)} / мин</strong>
+                      <button className="ghost-button" type="button" onClick={() => startEditingCar(car)}>
+                        Редактировать
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </section>
       )}
 
