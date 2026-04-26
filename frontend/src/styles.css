@@ -363,6 +363,11 @@ button:disabled {
   gap: 18px;
 }
 
+.simple-list,
+.detail-list {
+  align-content: start;
+}
+
 .dashboard-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
@@ -669,6 +674,44 @@ button:disabled {
 
 .application-card {
   align-items: flex-start;
+}
+
+.coefficient-card {
+  align-items: end;
+}
+
+.coefficient-table {
+  display: grid;
+  gap: 10px;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.coefficient-table-header {
+  display: flex;
+  align-items: end;
+  gap: 18px;
+  padding: 0 18px;
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.coefficient-header-fields {
+  align-items: end;
+}
+
+.coefficient-header-action,
+.coefficient-card .primary-button {
+  flex: 0 0 120px;
+}
+
+.coefficient-form-row {
+  display: grid;
+  flex: 1 1 auto;
+  grid-template-columns: minmax(180px, 1.4fr) repeat(3, minmax(120px, 0.7fr));
+  gap: 12px;
 }
 
 .text-success {
@@ -1098,6 +1141,18 @@ body {
     gap: 10px;
     padding: 12px;
     border-radius: 18px;
+  }
+
+  .coefficient-card {
+    align-items: stretch;
+  }
+
+  .coefficient-table-header {
+    display: none;
+  }
+
+  .coefficient-form-row {
+    grid-template-columns: 1fr;
   }
 
   .button-row {

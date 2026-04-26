@@ -9,7 +9,7 @@ import { WaitingScreen } from "./components/WaitingScreen";
 type Coordinates = [number, number];
 type AuthMode = "login" | "register";
 type UserTab = "map" | "wallet" | "activity";
-type AdminTab = "map" | "wallet" | "activity" | "users" | "applications" | "fleet" | "bookings" | "trips" | "tariff" | "zones";
+type AdminTab = "map" | "wallet" | "activity" | "users" | "fleet" | "bookings" | "tariff" | "zones";
 type RouteSummary = {
   distanceKm: number | null;
   durationMinutes: number | null;
@@ -1178,12 +1178,6 @@ function AdminDashboard({ token, user, onLogout }: { token: string; user: User; 
   const [coefficients, setCoefficients] = useState<TimeCoefficient[]>([]);
   const [bonusZones, setBonusZones] = useState<BonusZone[]>([]);
   const [carForm, setCarForm] = useState<CarForm>(initialCarForm);
-  const [coefficientForm, setCoefficientForm] = useState({
-    name: "",
-    start_time: "10:00",
-    end_time: "16:30",
-    coefficient: "1.00",
-  });
   const [zoneForm, setZoneForm] = useState<BonusZoneForm>(initialBonusZoneForm);
   const [selectedCarId, setSelectedCarId] = useState<number | null>(null);
   const [editingCarId, setEditingCarId] = useState<number | null>(null);
@@ -1508,15 +1502,24 @@ function AdminDashboard({ token, user, onLogout }: { token: string; user: User; 
     });
   };
 
-  const handleCreateCoefficient = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    void runAction(() => api.adminCreateCoefficient(token, coefficientForm), "Коэффициент добавлен").then(() =>
-      setCoefficientForm({
-        name: "",
-        start_time: "10:00",
-        end_time: "16:30",
-        coefficient: "1.00",
-      }),
+  const updateCoefficientField = (coefficientId: number, field: keyof TimeCoefficient, value: string) => {
+    setCoefficients((current) =>
+      current.map((coefficient) =>
+        coefficient.id === coefficientId ? { ...coefficient, [field]: value } : coefficient,
+      ),
+    );
+  };
+
+  const handleSaveCoefficient = (coefficient: TimeCoefficient) => {
+    void runAction(
+      () =>
+        api.adminUpdateCoefficient(token, coefficient.id, {
+          name: coefficient.name,
+          start_time: coefficient.start_time,
+          end_time: coefficient.end_time,
+          coefficient: coefficient.coefficient,
+        }),
+      "Коэффициент сохранен",
     );
   };
 
@@ -1578,10 +1581,8 @@ function AdminDashboard({ token, user, onLogout }: { token: string; user: User; 
           { value: "wallet", label: "Кошелек" },
           { value: "activity", label: "Активность" },
           { value: "users", label: "Пользователи" },
-          { value: "applications", label: "Заявки" },
           { value: "fleet", label: "Автомобили" },
-          { value: "bookings", label: "Брони" },
-          { value: "trips", label: "Поездки" },
+          { value: "bookings", label: "Брони и поездки" },
           { value: "tariff", label: "Тариф" },
           { value: "zones", label: "Зоны" },
         ]}
@@ -1894,7 +1895,54 @@ function AdminDashboard({ token, user, onLogout }: { token: string; user: User; 
       )}
 
       {tab === "users" && (
-        <section className="dashboard-stack">
+        <section className="dashboard-grid">
+          <div className="panel">
+            <span className="eyebrow">Модерация</span>
+            <h2>Заявки пользователей</h2>
+            {pendingUsers.length === 0 ? (
+              <p className="muted">Новых заявок сейчас нет</p>
+            ) : (
+              <div className="simple-list section-content-offset">
+                {pendingUsers.map((item) => (
+                  <div className="application-card" key={item.id}>
+                    <div>
+                      <strong>{item.full_name || buildFullName(item)}</strong>
+                      <span>{item.email}</span>
+                      <span>Телефон: {item.phone}</span>
+                      <span>ВУ: {item.driver_license_number}</span>
+                    </div>
+                    <div className="button-row">
+                      <button
+                        className="primary-button"
+                        type="button"
+                        onClick={() =>
+                          void runAction(
+                            () => api.adminUserAction(token, item.id, "approve"),
+                            "Заявка одобрена",
+                          )
+                        }
+                      >
+                        Одобрить
+                      </button>
+                      <button
+                        className="ghost-button"
+                        type="button"
+                        onClick={() =>
+                          void runAction(
+                            () => api.adminUserAction(token, item.id, "reject"),
+                            "Заявка отклонена",
+                          )
+                        }
+                      >
+                        Отклонить
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
           <div className="panel">
             <span className="eyebrow">Пользователи</span>
             <h2>Список пользователей</h2>
@@ -2006,7 +2054,7 @@ function AdminDashboard({ token, user, onLogout }: { token: string; user: User; 
       )}
 
       {tab === "bookings" && (
-        <section className="dashboard-stack">
+        <section className="dashboard-grid">
           <div className="panel">
             <span className="eyebrow">Брони</span>
             <h2>Все бронирования</h2>
@@ -2025,11 +2073,7 @@ function AdminDashboard({ token, user, onLogout }: { token: string; user: User; 
               ))}
             </div>
           </div>
-        </section>
-      )}
 
-      {tab === "trips" && (
-        <section className="dashboard-stack">
           <div className="panel">
             <span className="eyebrow">Поездки</span>
             <h2>Все поездки</h2>
@@ -2050,57 +2094,6 @@ function AdminDashboard({ token, user, onLogout }: { token: string; user: User; 
                 </div>
               ))}
             </div>
-          </div>
-        </section>
-      )}
-
-      {tab === "applications" && (
-        <section className="dashboard-stack">
-          <div className="panel">
-            <span className="eyebrow">Модерация</span>
-            <h2>Заявки пользователей</h2>
-            {pendingUsers.length === 0 ? (
-              <p className="muted">Новых заявок сейчас нет</p>
-            ) : (
-              <div className="simple-list section-content-offset">
-                {pendingUsers.map((item) => (
-                  <div className="application-card" key={item.id}>
-                    <div>
-                      <strong>{item.full_name || buildFullName(item)}</strong>
-                      <span>{item.email}</span>
-                      <span>Телефон: {item.phone}</span>
-                      <span>ВУ: {item.driver_license_number}</span>
-                    </div>
-                    <div className="button-row">
-                      <button
-                        className="primary-button"
-                        type="button"
-                        onClick={() =>
-                          void runAction(
-                            () => api.adminUserAction(token, item.id, "approve"),
-                            "Заявка одобрена",
-                          )
-                        }
-                      >
-                        Одобрить
-                      </button>
-                      <button
-                        className="ghost-button"
-                        type="button"
-                        onClick={() =>
-                          void runAction(
-                            () => api.adminUserAction(token, item.id, "reject"),
-                            "Заявка отклонена",
-                          )
-                        }
-                      >
-                        Отклонить
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
           </div>
         </section>
       )}
@@ -2228,91 +2221,64 @@ function AdminDashboard({ token, user, onLogout }: { token: string; user: User; 
       )}
 
       {tab === "tariff" && (
-        <section className="dashboard-grid">
+        <section className="dashboard-stack">
           <div className="panel">
-            <span className="eyebrow">Тариф</span>
-            <h2>Настройки поездок</h2>
-            <div className="form-stack section-content-offset">
-              <label>
-                Минимальный баланс
-                <input
-                  value={tariff?.min_start_balance ?? ""}
-                  onChange={(event) =>
-                    setTariff((value) => (value ? { ...value, min_start_balance: event.target.value } : value))
-                  }
-                />
-              </label>
-              <button
-                className="primary-button"
-                type="button"
-                disabled={!tariff}
-                onClick={() =>
-                  tariff &&
-                  void runAction(
-                    () =>
-                      api.adminUpdateTariff(token, {
-                        min_start_balance: tariff.min_start_balance,
-                      }),
-                    "Тариф сохранен",
-                  )
-                }
-              >
-                Сохранить тариф
-              </button>
-            </div>
-          </div>
-
-          <div className="panel">
-            <span className="eyebrow">Контекст</span>
-            <h2>Коэффициенты времени</h2>
-            <p className="helper-text">
-              Цена поездки считается как минуты поездки, умноженные на цену выбранной машины и коэффициент времени
-              старта. Коэффициент фиксируется при начале поездки
-            </p>
-            <div className="simple-list section-content-offset">
+            <span className="eyebrow">Час пик</span>
+            <h2>Коэффициенты спроса</h2>
+            <div className="coefficient-table section-content-offset">
+              <div className="coefficient-table-header">
+                <div className="coefficient-form-row coefficient-header-fields">
+                  <span>Название</span>
+                  <span>Начало</span>
+                  <span>Конец</span>
+                  <span>Коэффициент</span>
+                </div>
+                <span className="coefficient-header-action"></span>
+              </div>
               {coefficients.map((coefficient) => (
-                <div className="list-card" key={coefficient.id}>
-                  <div>
-                    <strong>{coefficient.name}</strong>
-                    <span>
-                      {coefficient.start_time.slice(0, 5)} - {coefficient.end_time.slice(0, 5)}
-                    </span>
+                <div className="list-card coefficient-card" key={coefficient.id}>
+                  <div className="coefficient-form-row">
+                    <div>
+                      <input
+                        aria-label="Название"
+                        value={coefficient.name}
+                        onChange={(event) => updateCoefficientField(coefficient.id, "name", event.target.value)}
+                        required
+                      />
+                    </div>
+                    <div>
+                      <input
+                        aria-label="Начало"
+                        type="time"
+                        value={coefficient.start_time.slice(0, 5)}
+                        onChange={(event) => updateCoefficientField(coefficient.id, "start_time", event.target.value)}
+                        required
+                      />
+                    </div>
+                    <div>
+                      <input
+                        aria-label="Конец"
+                        type="time"
+                        value={coefficient.end_time.slice(0, 5)}
+                        onChange={(event) => updateCoefficientField(coefficient.id, "end_time", event.target.value)}
+                        required
+                      />
+                    </div>
+                    <div>
+                      <input
+                        aria-label="Коэффициент"
+                        value={coefficient.coefficient}
+                        onChange={(event) => updateCoefficientField(coefficient.id, "coefficient", event.target.value)}
+                        required
+                      />
+                    </div>
                   </div>
-                  <strong>x{coefficient.coefficient}</strong>
+                  <button className="primary-button" type="button" onClick={() => handleSaveCoefficient(coefficient)}>
+                    Сохранить
+                  </button>
                 </div>
               ))}
             </div>
-            <form className="form-stack section-content-offset" onSubmit={handleCreateCoefficient}>
-              <input
-                placeholder="Название коэффициента"
-                value={coefficientForm.name}
-                onChange={(event) => setCoefficientForm((form) => ({ ...form, name: event.target.value }))}
-                required
-              />
-              <div className="two-columns">
-                <input
-                  type="time"
-                  value={coefficientForm.start_time}
-                  onChange={(event) => setCoefficientForm((form) => ({ ...form, start_time: event.target.value }))}
-                  required
-                />
-                <input
-                  type="time"
-                  value={coefficientForm.end_time}
-                  onChange={(event) => setCoefficientForm((form) => ({ ...form, end_time: event.target.value }))}
-                  required
-                />
-              </div>
-              <input
-                placeholder="Коэффициент"
-                value={coefficientForm.coefficient}
-                onChange={(event) => setCoefficientForm((form) => ({ ...form, coefficient: event.target.value }))}
-                required
-              />
-              <button className="primary-button" type="submit">
-                Добавить коэффициент
-              </button>
-            </form>
           </div>
         </section>
       )}
