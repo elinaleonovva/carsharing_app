@@ -175,11 +175,11 @@ export const api = {
       token,
       body: { car_id: carId, latitude, longitude },
     }),
-  finishTrip: (token: string, tripId: number, latitude: string, longitude: string) =>
+  finishTrip: (token: string, tripId: number, latitude: string, longitude: string, routeDurationMinutes?: number) =>
     request<Trip>(`/trips/${tripId}/finish/`, {
       method: "POST",
       token,
-      body: { latitude, longitude },
+      body: { latitude, longitude, route_duration_minutes: routeDurationMinutes },
     }),
   setTripDestination: (token: string, tripId: number, latitude: string, longitude: string) =>
     request<Trip>(`/trips/${tripId}/destination/`, {

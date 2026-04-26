@@ -242,10 +242,14 @@ button:disabled {
 .map-message {
   position: absolute;
   top: 24px;
-  right: 24px;
+  left: 24px;
   z-index: 5;
   width: min(430px, calc(100% - 48px));
   margin: 0;
+  border-color: rgba(126, 70, 18, 0.22);
+  background: #fff4d9;
+  color: #59330c;
+  box-shadow: 0 18px 44px rgba(91, 50, 8, 0.18);
 }
 
 .loading-banner {
@@ -540,6 +544,13 @@ button:disabled {
 
 .trip-popup {
   width: min(430px, calc(100% - 48px));
+  gap: 10px;
+}
+
+.trip-popup .popup-lead {
+  margin-top: -6px;
+  font-size: 15px;
+  font-weight: 700;
 }
 
 .detail-list {
@@ -676,7 +687,7 @@ button:disabled {
 
   .map-message {
     top: 14px;
-    right: 14px;
+    left: 14px;
     width: calc(100% - 28px);
   }
 }

@@ -76,6 +76,7 @@ class StartTripSerializer(serializers.Serializer):
 class FinishTripSerializer(serializers.Serializer):
     latitude = serializers.DecimalField(max_digits=9, decimal_places=6)
     longitude = serializers.DecimalField(max_digits=9, decimal_places=6)
+    route_duration_minutes = serializers.IntegerField(min_value=1, required=False)
 
 
 class TripDestinationSerializer(serializers.Serializer):

@@ -134,6 +134,7 @@ class TripFinishAPIView(ServiceAccessMixin, APIView):
             trip,
             serializer.validated_data["latitude"],
             serializer.validated_data["longitude"],
+            serializer.validated_data.get("route_duration_minutes"),
         )
         return Response(TripSerializer(trip).data)
 

@@ -721,7 +721,7 @@ function UserDashboard({ token, user, onLogout }: { token: string; user: User; o
       .setTripDestination(token, activeTrip.id, toApiCoordinate(coords[0]), toApiCoordinate(coords[1]))
       .then((trip) => {
         setActiveTrip(trip);
-        setMessage("Точка назначения выбрана, маршрут построится автоматически.");
+        setMessage("");
       })
       .catch((error) => setMessage(getErrorMessage(error)));
   };
@@ -738,7 +738,14 @@ function UserDashboard({ token, user, onLogout }: { token: string; user: User; o
     }
 
     void runAction(
-      () => api.finishTrip(token, activeTrip.id, toApiCoordinate(destinationLocation[0]), toApiCoordinate(destinationLocation[1])),
+      () =>
+        api.finishTrip(
+          token,
+          activeTrip.id,
+          toApiCoordinate(destinationLocation[0]),
+          toApiCoordinate(destinationLocation[1]),
+          destinationRouteSummary.durationMinutes ?? undefined,
+        ),
       "Поездка завершена.",
     );
   };
@@ -805,17 +812,11 @@ function UserDashboard({ token, user, onLogout }: { token: string; user: User; o
                   <h3>
                     {activeTrip.car.brand} {activeTrip.car.model}
                   </h3>
-                  <p className="popup-lead">
-                    Поставьте на карте точку назначения: маршрут и примерная стоимость появятся здесь.
-                  </p>
+                  <p className="popup-lead">Поставьте на карте точку назначения.</p>
                   <div className="detail-list">
                     <div>
                       <span>Цена машины</span>
                       <strong>{formatMoney(activeTrip.price_per_minute)} / мин</strong>
-                    </div>
-                    <div>
-                      <span>Коэффициент</span>
-                      <strong>x{activeTrip.coefficient}</strong>
                     </div>
                     <div>
                       <span>Маршрут</span>
@@ -828,11 +829,11 @@ function UserDashboard({ token, user, onLogout }: { token: string; user: User; o
                       </strong>
                     </div>
                     <div>
-                      <span>В пути</span>
+                      <span>Время маршрута</span>
                       <strong>
                         {destinationRouteSummary.durationMinutes === null
                           ? "Оценка появится после маршрута"
-                          : `Около ${destinationRouteSummary.durationMinutes} мин`}
+                          : `${destinationRouteSummary.durationMinutes} мин`}
                       </strong>
                     </div>
                     <div>
@@ -843,14 +844,11 @@ function UserDashboard({ token, user, onLogout }: { token: string; user: User; o
                   <button
                     className="primary-button"
                     type="button"
-                    disabled={!destinationLocation}
+                    disabled={!destinationLocation || destinationRouteSummary.durationMinutes === null}
                     onClick={handleFinishTrip}
                   >
                     Завершить поездку
                   </button>
-                  <p className="inline-note">
-                    Итоговая сумма зависит от фактического времени поездки и будет списана после завершения.
-                  </p>
                 </aside>
               )}
 
@@ -1592,7 +1590,7 @@ function FleetMap({
         {
           referencePoints: [userLocation, getCarCoords(routeCar)],
           params: {
-            routingMode: "auto",
+            routingMode: "pedestrian",
           },
         },
         {
@@ -1640,9 +1638,11 @@ function FleetMap({
       );
 
       destinationRoute.model.events.add("requestsuccess", () => {
-        const activeRoute = destinationRoute.getActiveRoute();
-        const distanceMeters = activeRoute?.properties.get("distance")?.value ?? null;
-        const durationSeconds = activeRoute?.properties.get("duration")?.value ?? null;
+        const activeRoute = destinationRoute.getActiveRoute?.() ?? destinationRoute.getRoutes?.().get(0);
+        const distance = activeRoute?.properties.get("distance");
+        const duration = activeRoute?.properties.get("duration");
+        const distanceMeters = typeof distance?.value === "number" ? distance.value : null;
+        const durationSeconds = typeof duration?.value === "number" ? duration.value : null;
         routeSummaryChangeRef.current?.({
           distanceKm: distanceMeters === null ? null : Number((distanceMeters / 1000).toFixed(1)),
           durationMinutes: durationSeconds === null ? null : Math.max(1, Math.ceil(durationSeconds / 60)),

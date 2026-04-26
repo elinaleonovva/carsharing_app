@@ -1,5 +1,5 @@
 from datetime import timedelta
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 
 from django.db import transaction
 from django.utils import timezone
@@ -156,19 +156,26 @@ def set_trip_destination(trip: Trip, latitude, longitude) -> Trip:
 
 
 @transaction.atomic
-def finish_trip(trip: Trip, latitude, longitude) -> Trip:
+def finish_trip(trip: Trip, latitude, longitude, route_duration_minutes=None) -> Trip:
     if trip.status != Trip.Status.ACTIVE:
         raise serializers.ValidationError("Поездка уже завершена")
 
     finished_at = timezone.now()
-    total_price = trip.calculate_price(finished_at)
+    if route_duration_minutes is not None:
+        total_minutes = max(1, int(route_duration_minutes))
+        total_price = (
+            Decimal(total_minutes) * trip.price_per_minute * trip.coefficient
+        ).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    else:
+        total_price = trip.calculate_price(finished_at)
+        seconds = max(60, int((finished_at - trip.started_at).total_seconds()))
+        total_minutes = (seconds + 59) // 60
 
-    seconds = max(60, int((finished_at - trip.started_at).total_seconds()))
     trip.status = Trip.Status.COMPLETED
     trip.finished_at = finished_at
     trip.end_latitude = latitude
     trip.end_longitude = longitude
-    trip.total_minutes = (seconds + 59) // 60
+    trip.total_minutes = total_minutes
     trip.total_price = total_price
     trip.save()
 
