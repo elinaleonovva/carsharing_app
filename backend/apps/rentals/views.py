@@ -5,17 +5,14 @@ from rest_framework.views import APIView
 from apps.accounts.models import User
 from apps.accounts.permissions import IsAdminRole, IsNotBlocked
 
-from .models import Booking, BonusZone, Car, Tariff, TimeCoefficient, Trip, WalletTransaction
+from .models import Booking, Car, Trip, WalletTransaction
 from .serializers import (
     AdminUserActionSerializer,
     AdminUserSerializer,
     BookingSerializer,
-    BonusZoneSerializer,
     CarSerializer,
     FinishTripSerializer,
     StartTripSerializer,
-    TariffSerializer,
-    TimeCoefficientSerializer,
     TopUpSerializer,
     TripSerializer,
     TripDestinationSerializer,
@@ -26,7 +23,6 @@ from .services import (
     create_booking,
     expire_stale_bookings,
     finish_trip,
-    get_tariff,
     set_trip_destination,
     start_trip,
     top_up_wallet,
@@ -184,16 +180,6 @@ class WalletTopUpAPIView(ServiceAccessMixin, APIView):
         return Response(WalletTransactionSerializer(transaction).data, status=status.HTTP_201_CREATED)
 
 
-class BonusZonesAPIView(ServiceAccessMixin, APIView):
-    def get(self, request):
-        access_error = self.check_service_access(request)
-        if access_error:
-            return access_error
-
-        zones = BonusZone.objects.filter(is_active=True)
-        return Response(BonusZoneSerializer(zones, many=True).data)
-
-
 class AdminUsersAPIView(APIView):
     permission_classes = [IsAdminRole]
 
@@ -261,44 +247,6 @@ class AdminCarDetailAPIView(APIView):
         return Response(CarSerializer(car).data)
 
 
-class AdminTariffAPIView(APIView):
-    permission_classes = [IsAdminRole]
-
-    def get(self, request):
-        return Response(TariffSerializer(get_tariff()).data)
-
-    def patch(self, request):
-        tariff = get_tariff()
-        serializer = TariffSerializer(tariff, data=request.data, partial=True)
-        serializer.is_valid(raise_exception=True)
-        tariff = serializer.save()
-        return Response(TariffSerializer(tariff).data)
-
-
-class AdminCoefficientsAPIView(APIView):
-    permission_classes = [IsAdminRole]
-
-    def get(self, request):
-        return Response(TimeCoefficientSerializer(TimeCoefficient.objects.all(), many=True).data)
-
-    def post(self, request):
-        serializer = TimeCoefficientSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        coefficient = serializer.save()
-        return Response(TimeCoefficientSerializer(coefficient).data, status=status.HTTP_201_CREATED)
-
-
-class AdminCoefficientDetailAPIView(APIView):
-    permission_classes = [IsAdminRole]
-
-    def patch(self, request, pk):
-        coefficient = TimeCoefficient.objects.get(pk=pk)
-        serializer = TimeCoefficientSerializer(coefficient, data=request.data, partial=True)
-        serializer.is_valid(raise_exception=True)
-        coefficient = serializer.save()
-        return Response(TimeCoefficientSerializer(coefficient).data)
-
-
 class AdminBookingsAPIView(APIView):
     permission_classes = [IsAdminRole]
 
@@ -316,25 +264,3 @@ class AdminTripsAPIView(APIView):
         return Response(TripSerializer(trips, many=True).data)
 
 
-class AdminBonusZonesAPIView(APIView):
-    permission_classes = [IsAdminRole]
-
-    def get(self, request):
-        return Response(BonusZoneSerializer(BonusZone.objects.all(), many=True).data)
-
-    def post(self, request):
-        serializer = BonusZoneSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        zone = serializer.save()
-        return Response(BonusZoneSerializer(zone).data, status=status.HTTP_201_CREATED)
-
-
-class AdminBonusZoneDetailAPIView(APIView):
-    permission_classes = [IsAdminRole]
-
-    def patch(self, request, pk):
-        zone = BonusZone.objects.get(pk=pk)
-        serializer = BonusZoneSerializer(zone, data=request.data, partial=True)
-        serializer.is_valid(raise_exception=True)
-        zone = serializer.save()
-        return Response(BonusZoneSerializer(zone).data)

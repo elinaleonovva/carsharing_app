@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Booking, BonusZone, Car, Tariff, TimeCoefficient, Trip, WalletTransaction
+from .models import Booking, Car, Trip, WalletTransaction
 
 
 @admin.register(Car)
@@ -10,9 +10,6 @@ class CarAdmin(admin.ModelAdmin):
     search_fields = ("brand", "model", "license_plate")
 
 
-admin.site.register(Tariff)
-admin.site.register(TimeCoefficient)
-admin.site.register(BonusZone)
 admin.site.register(Booking)
 admin.site.register(Trip)
 admin.site.register(WalletTransaction)

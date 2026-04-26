@@ -1,21 +1,15 @@
-from django.urls import path
+from django.urls import include, path
 
 from .views import (
     AdminApplicationsAPIView,
     AdminBookingsAPIView,
-    AdminBonusZoneDetailAPIView,
-    AdminBonusZonesAPIView,
     AdminCarDetailAPIView,
     AdminCarsAPIView,
-    AdminCoefficientDetailAPIView,
-    AdminCoefficientsAPIView,
-    AdminTariffAPIView,
     AdminUserActionAPIView,
     AdminTripsAPIView,
     AdminUsersAPIView,
     BookingCancelAPIView,
     BookingsAPIView,
-    BonusZonesAPIView,
     CarsAPIView,
     TripFinishAPIView,
     TripDestinationAPIView,
@@ -27,8 +21,8 @@ from .views import (
 
 
 urlpatterns = [
+    path("", include("apps.pricing.urls")),
     path("cars/", CarsAPIView.as_view(), name="cars"),
-    path("bonus-zones/", BonusZonesAPIView.as_view(), name="bonus-zones"),
     path("bookings/", BookingsAPIView.as_view(), name="bookings"),
     path("bookings/<int:pk>/cancel/", BookingCancelAPIView.as_view(), name="booking-cancel"),
     path("trips/", TripsAPIView.as_view(), name="trips"),
@@ -44,9 +38,4 @@ urlpatterns = [
     path("admin/cars/<int:pk>/", AdminCarDetailAPIView.as_view(), name="admin-car-detail"),
     path("admin/bookings/", AdminBookingsAPIView.as_view(), name="admin-bookings"),
     path("admin/trips/", AdminTripsAPIView.as_view(), name="admin-trips"),
-    path("admin/tariff/", AdminTariffAPIView.as_view(), name="admin-tariff"),
-    path("admin/coefficients/", AdminCoefficientsAPIView.as_view(), name="admin-coefficients"),
-    path("admin/coefficients/<int:pk>/", AdminCoefficientDetailAPIView.as_view(), name="admin-coefficient-detail"),
-    path("admin/bonus-zones/", AdminBonusZonesAPIView.as_view(), name="admin-bonus-zones"),
-    path("admin/bonus-zones/<int:pk>/", AdminBonusZoneDetailAPIView.as_view(), name="admin-bonus-zone-detail"),
 ]

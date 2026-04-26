@@ -6,7 +6,7 @@ from rest_framework import serializers
 from apps.accounts.serializers import UserSerializer
 
 from .geo import is_inside_mkad
-from .models import Booking, BonusZone, Car, Tariff, TimeCoefficient, Trip, WalletTransaction
+from .models import Booking, Car, Trip, WalletTransaction
 
 
 User = get_user_model()
@@ -114,40 +114,6 @@ class WalletTransactionSerializer(serializers.ModelSerializer):
 
 class TopUpSerializer(serializers.Serializer):
     amount = serializers.DecimalField(max_digits=10, decimal_places=2, min_value=Decimal("1.00"))
-
-
-class TariffSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Tariff
-        fields = ("id", "name", "price_per_minute", "min_start_balance")
-
-
-class TimeCoefficientSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = TimeCoefficient
-        fields = ("id", "name", "start_time", "end_time", "coefficient")
-
-
-class BonusZoneSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = BonusZone
-        fields = (
-            "id",
-            "name",
-            "latitude",
-            "longitude",
-            "radius_meters",
-            "discount_percent",
-            "is_active",
-            "created_at",
-        )
-
-    def validate(self, attrs):
-        latitude = attrs.get("latitude", getattr(self.instance, "latitude", None))
-        longitude = attrs.get("longitude", getattr(self.instance, "longitude", None))
-        if latitude is not None and longitude is not None and not is_inside_mkad(latitude, longitude):
-            raise serializers.ValidationError("Зону можно поставить только внутри МКАД")
-        return attrs
 
 
 class AdminUserSerializer(UserSerializer):
