@@ -2300,6 +2300,9 @@ function AdminDashboard({ token, user, onLogout }: { token: string; user: User; 
                         type="time"
                         value={coefficient.start_time.slice(0, 5)}
                         onChange={(event) => updateCoefficientField(coefficient.id, "start_time", event.target.value)}
+                        min="00:00"
+                        max="23:59"
+                        step="60"
                         required
                       />
                     </div>
@@ -2309,14 +2312,25 @@ function AdminDashboard({ token, user, onLogout }: { token: string; user: User; 
                         type="time"
                         value={coefficient.end_time.slice(0, 5)}
                         onChange={(event) => updateCoefficientField(coefficient.id, "end_time", event.target.value)}
+                        min="00:00"
+                        max="23:59"
+                        step="60"
                         required
                       />
                     </div>
                     <div>
                       <input
                         aria-label="Коэффициент"
+                        type="number"
+                        inputMode="decimal"
                         value={coefficient.coefficient}
                         onChange={(event) => updateCoefficientField(coefficient.id, "coefficient", event.target.value)}
+                        onKeyDown={(event) => {
+                          if (blockedNumberKeys.includes(event.key) || event.key === "-") event.preventDefault();
+                        }}
+                        min="0.01"
+                        max="9"
+                        step="0.01"
                         required
                       />
                     </div>

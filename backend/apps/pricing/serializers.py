@@ -15,6 +15,13 @@ class TimeCoefficientSerializer(serializers.ModelSerializer):
         model = TimeCoefficient
         fields = ("id", "name", "start_time", "end_time", "coefficient")
 
+    def validate_coefficient(self, value):
+        if value <= 0:
+            raise serializers.ValidationError("Коэффициент должен быть больше нуля")
+        if value > 9:
+            raise serializers.ValidationError("Коэффициент не может быть больше 9")
+        return value
+
 
 class BonusZoneSerializer(serializers.ModelSerializer):
     class Meta:
