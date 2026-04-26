@@ -19,6 +19,7 @@ export function FleetMap({
   routeFrom = null,
   onRouteSummaryChange,
   bonusZones = [],
+  bonusZonePreview = null,
   onBonusZoneCenterChange,
 }: FleetMapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -32,6 +33,23 @@ export function FleetMap({
   const [isLoading, setIsLoading] = useState(true);
   const [isMapReady, setIsMapReady] = useState(false);
   const [error, setError] = useState("");
+  const bonusZonesKey = bonusZones
+    .map((zone) => `${zone.id}:${zone.latitude}:${zone.longitude}:${zone.radius_meters}:${zone.discount_percent}`)
+    .join("|");
+
+  const handleMapCoordinateSelect = (coords: Coordinates) => {
+    if (bonusZoneCenterChangeRef.current) {
+      bonusZoneCenterChangeRef.current(coords);
+      return;
+    }
+
+    if (destinationChangeRef.current) {
+      destinationChangeRef.current(coords);
+      return;
+    }
+
+    locationChangeRef.current?.(coords);
+  };
 
   useEffect(() => {
     locationChangeRef.current = onUserLocationChange;
@@ -87,17 +105,7 @@ export function FleetMap({
           }
 
           const normalizedCoords: Coordinates = [Number(coords[0]), Number(coords[1])];
-          if (bonusZoneCenterChangeRef.current) {
-            bonusZoneCenterChangeRef.current(normalizedCoords);
-            return;
-          }
-
-          if (destinationChangeRef.current) {
-            destinationChangeRef.current(normalizedCoords);
-            return;
-          }
-
-          locationChangeRef.current?.(normalizedCoords);
+          handleMapCoordinateSelect(normalizedCoords);
         });
 
         mapRef.current = map;
@@ -125,6 +133,38 @@ export function FleetMap({
 
   useEffect(() => {
     const map = mapRef.current;
+    const container = containerRef.current;
+
+    if (!map || !container || !isMapReady) {
+      return;
+    }
+
+    const fitToViewport = () => {
+      map.container?.fitToViewport?.();
+    };
+
+    fitToViewport();
+    const animationFrame = window.requestAnimationFrame(fitToViewport);
+    const firstTimer = window.setTimeout(fitToViewport, 80);
+    const secondTimer = window.setTimeout(fitToViewport, 300);
+    const resizeObserver = "ResizeObserver" in window ? new ResizeObserver(fitToViewport) : null;
+    resizeObserver?.observe(container);
+    if (container.parentElement) {
+      resizeObserver?.observe(container.parentElement);
+    }
+    window.addEventListener("resize", fitToViewport);
+
+    return () => {
+      window.cancelAnimationFrame(animationFrame);
+      window.clearTimeout(firstTimer);
+      window.clearTimeout(secondTimer);
+      resizeObserver?.disconnect();
+      window.removeEventListener("resize", fitToViewport);
+    };
+  }, [isMapReady]);
+
+  useEffect(() => {
+    const map = mapRef.current;
     const ymaps = ymapsRef.current;
 
     if (!map || !ymaps || !isMapReady) {
@@ -134,12 +174,13 @@ export function FleetMap({
     map.geoObjects.removeAll();
 
     for (const zone of bonusZones) {
+      const shortBonusText = `Бонусная зона. Скидка ${zone.discount_percent}% за финиш здесь`;
       const circle = new ymaps.Circle(
         [[Number(zone.latitude), Number(zone.longitude)], Number(zone.radius_meters)],
         {
-          hintContent: `${zone.name}: скидка ${zone.discount_percent}%`,
-          balloonContentHeader: zone.name,
-          balloonContentBody: `Скидка ${zone.discount_percent}% при завершении поездки в этой зоне`,
+          hintContent: shortBonusText,
+          balloonContentHeader: "Бонусная зона",
+          balloonContentBody: shortBonusText,
         },
         {
           fillColor: "#f7a84b33",
@@ -148,7 +189,44 @@ export function FleetMap({
           strokeWidth: 2,
         },
       );
+      circle.events.add("click", (event) => {
+        const coords = event.get("coords");
+        if (Array.isArray(coords)) {
+          handleMapCoordinateSelect([Number(coords[0]), Number(coords[1])]);
+        }
+      });
       map.geoObjects.add(circle);
+    }
+
+    if (bonusZonePreview) {
+      const previewLatitude = Number(bonusZonePreview.latitude);
+      const previewLongitude = Number(bonusZonePreview.longitude);
+      const previewRadius = Number(bonusZonePreview.radius_meters);
+
+      if (Number.isFinite(previewLatitude) && Number.isFinite(previewLongitude) && previewRadius > 0) {
+        const previewCircle = new ymaps.Circle(
+          [[previewLatitude, previewLongitude], previewRadius],
+          {
+            hintContent: "Бонусная зона. Скидка 10% за финиш здесь",
+            balloonContentHeader: "Бонусная зона",
+            balloonContentBody: `Радиус ${previewRadius} м`,
+          },
+          {
+            fillColor: "#1d6b5738",
+            strokeColor: "#174c43",
+            strokeOpacity: 0.95,
+            strokeWidth: 4,
+          },
+        );
+        previewCircle.events.add("click", (event) => {
+          const coords = event.get("coords");
+          if (Array.isArray(coords)) {
+            handleMapCoordinateSelect([Number(coords[0]), Number(coords[1])]);
+          }
+        });
+
+        map.geoObjects.add(previewCircle);
+      }
     }
 
     for (const car of cars) {
@@ -262,7 +340,11 @@ export function FleetMap({
     }
   }, [
     cars,
-    bonusZones,
+    bonusZonesKey,
+    bonusZonePreview?.latitude,
+    bonusZonePreview?.longitude,
+    bonusZonePreview?.radius_meters,
+    bonusZonePreview?.name,
     destinationLocation?.[0],
     destinationLocation?.[1],
     isMapReady,

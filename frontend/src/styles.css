@@ -971,6 +971,44 @@ body {
   border-radius: 13px;
 }
 
+.zones-layout > .wide-panel {
+  padding: 0;
+  overflow: hidden;
+}
+
+.zones-layout > .wide-panel .map-stage {
+  flex: 1 1 auto;
+}
+
+.zones-layout > .panel:not(.wide-panel) .form-stack {
+  gap: 8px;
+  overflow: visible;
+  padding-right: 0;
+}
+
+.zones-layout > .panel:not(.wide-panel) h2 {
+  margin-bottom: 4px;
+  font-size: 20px;
+}
+
+.zones-layout > .panel:not(.wide-panel) .helper-text {
+  margin-bottom: 6px;
+  line-height: 1.3;
+}
+
+.zones-layout > .panel:not(.wide-panel) input {
+  min-height: 42px;
+  border-radius: 13px;
+}
+
+.zones-layout > .panel:not(.wide-panel) .primary-button,
+.zones-layout > .panel:not(.wide-panel) .ghost-button {
+  width: fit-content;
+  min-height: 42px;
+  padding: 0 18px;
+  border-radius: 13px;
+}
+
 .panel {
   display: flex;
   min-height: 0;
@@ -1258,6 +1296,7 @@ body {
     width: calc(100% - 20px);
     padding: 12px 14px;
   }
+
 }
 
 @media (max-width: 420px) {

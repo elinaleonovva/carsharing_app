@@ -50,6 +50,13 @@ export type BonusZoneForm = {
   is_active: boolean;
 };
 
+export type BonusZonePreview = {
+  latitude: string;
+  longitude: string;
+  radius_meters: string;
+  name?: string;
+};
+
 export type FleetMapProps = {
   cars: Car[];
   selectedCarId: number | null;
@@ -62,5 +69,6 @@ export type FleetMapProps = {
   routeFrom?: Coordinates | null;
   onRouteSummaryChange?: (summary: RouteSummary) => void;
   bonusZones?: BonusZone[];
+  bonusZonePreview?: BonusZonePreview | null;
   onBonusZoneCenterChange?: (coords: Coordinates) => void;
 };

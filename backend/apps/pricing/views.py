@@ -27,8 +27,8 @@ class BonusZonesAPIView(ServiceAccessMixin, APIView):
         if access_error:
             return access_error
 
-        zones = BonusZone.objects.filter(is_active=True)
-        return Response(BonusZoneSerializer(zones, many=True).data)
+        zone = BonusZone.objects.filter(is_active=True).order_by("id").first()
+        return Response(BonusZoneSerializer([zone], many=True).data if zone else [])
 
 
 class AdminTariffAPIView(APIView):
@@ -73,10 +73,12 @@ class AdminBonusZonesAPIView(APIView):
     permission_classes = [IsAdminRole]
 
     def get(self, request):
-        return Response(BonusZoneSerializer(BonusZone.objects.all(), many=True).data)
+        zone = BonusZone.objects.order_by("id").first()
+        return Response(BonusZoneSerializer([zone], many=True).data if zone else [])
 
     def post(self, request):
-        serializer = BonusZoneSerializer(data=request.data)
+        zone = BonusZone.objects.order_by("id").first()
+        serializer = BonusZoneSerializer(zone, data=request.data, partial=zone is not None)
         serializer.is_valid(raise_exception=True)
         zone = serializer.save()
         return Response(BonusZoneSerializer(zone).data, status=status.HTTP_201_CREATED)

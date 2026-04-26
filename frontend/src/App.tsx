@@ -1,4 +1,4 @@
-﻿// @ts-nocheck
+// @ts-nocheck
 import { FormEvent, useEffect, useState } from "react";
 
 import { ApiError, Booking, BonusZone, Car, Tariff, TimeCoefficient, Trip, User, Wallet, api } from "./api";
@@ -45,6 +45,13 @@ type BonusZoneForm = {
   is_active: boolean;
 };
 
+type BonusZonePreview = {
+  latitude: string;
+  longitude: string;
+  radius_meters: string;
+  name?: string;
+};
+
 type FleetMapProps = {
   cars: Car[];
   selectedCarId: number | null;
@@ -57,6 +64,7 @@ type FleetMapProps = {
   routeFrom?: Coordinates | null;
   onRouteSummaryChange?: (summary: RouteSummary) => void;
   bonusZones?: BonusZone[];
+  bonusZonePreview?: BonusZonePreview | null;
   onBonusZoneCenterChange?: (coords: Coordinates) => void;
 };
 
@@ -116,9 +124,9 @@ const initialCarForm: CarForm = {
 };
 
 const initialBonusZoneForm: BonusZoneForm = {
-  name: "",
-  latitude: "55.751244",
-  longitude: "37.618423",
+  name: "Бонусная зона",
+  latitude: "",
+  longitude: "",
   radius_meters: "600",
   discount_percent: "10.00",
   is_active: true,
@@ -1198,6 +1206,16 @@ function AdminDashboard({ token, user, onLogout }: { token: string; user: User; 
   const pendingUsers = applications;
   const activeTrip = adminTrips.active;
   const history = adminTrips.history;
+  const primaryBonusZone = bonusZones[0] ?? null;
+  const bonusZonePreview =
+    zoneForm.latitude && zoneForm.longitude && Number(zoneForm.radius_meters) > 0
+      ? {
+          latitude: zoneForm.latitude,
+          longitude: zoneForm.longitude,
+          radius_meters: zoneForm.radius_meters,
+          name: "Бонусная зона",
+        }
+      : null;
   const selectedCarDistance = calculateDistanceKm(
     userLocation,
     selectedCar ? getCarCoords(selectedCar) : null,
@@ -1300,6 +1318,14 @@ function AdminDashboard({ token, user, onLogout }: { token: string; user: User; 
       void loadAdminData();
     }
   }, [adminBooking, bookingSecondsLeft]);
+
+  useEffect(() => {
+    if (tab !== "zones" || !primaryBonusZone || zoneForm.latitude || zoneForm.longitude) {
+      return;
+    }
+
+    startEditingZone(primaryBonusZone);
+  }, [tab, primaryBonusZone?.id, zoneForm.latitude, zoneForm.longitude]);
 
   useEffect(() => {
     if (!message) {
@@ -1451,6 +1477,14 @@ function AdminDashboard({ token, user, onLogout }: { token: string; user: User; 
     if (nextTab === "map") setMapMessage("");
     if (nextTab === "wallet") setWalletMessage("");
     if (nextTab === "activity") setActivityMessage("");
+    if (nextTab === "zones") {
+      if (primaryBonusZone) {
+        startEditingZone(primaryBonusZone);
+      } else {
+        setEditingZoneId(null);
+        setZoneForm(initialBonusZoneForm);
+      }
+    }
   };
 
   const buildCarPayload = () => ({
@@ -1534,38 +1568,63 @@ function AdminDashboard({ token, user, onLogout }: { token: string; user: User; 
 
   const handleZoneCenterChange = (coords: Coordinates) => {
     if (!isInsideMkad(coords)) {
-      setMessage("Зону можно поставить только внутри МКАД");
+      setMapMessage("Зону можно поставить только внутри МКАД");
       return;
     }
 
+    setMapMessage("");
     setZoneForm((form) => ({
       ...form,
       latitude: toApiCoordinate(coords[0]),
       longitude: toApiCoordinate(coords[1]),
     }));
-    setMessage("Центр бонусной зоны выбран на карте");
   };
 
-  const handleSaveBonusZone = (event: FormEvent<HTMLFormElement>) => {
+  const handleSaveBonusZone = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const action = editingZoneId
-      ? () => api.adminUpdateBonusZone(token, editingZoneId, zoneForm)
-      : () => api.adminCreateBonusZone(token, zoneForm);
-    void runAction(action, editingZoneId ? "Бонусная зона обновлена" : "Бонусная зона создана").then(() => {
-      setZoneForm(initialBonusZoneForm);
-      setEditingZoneId(null);
-    });
+    if (!zoneForm.latitude || !zoneForm.longitude) {
+      setMessage("Сначала выберите центр зоны кликом по карте");
+      return;
+    }
+
+    const payload = {
+      ...zoneForm,
+      name: "Бонусная зона",
+      discount_percent: "10.00",
+      is_active: true,
+    };
+    const zoneId = editingZoneId ?? primaryBonusZone?.id ?? null;
+
+    setMessage("");
+    try {
+      const savedZone = zoneId
+        ? await api.adminUpdateBonusZone(token, zoneId, payload)
+        : await api.adminCreateBonusZone(token, payload);
+      await loadAdminData();
+      setEditingZoneId(savedZone.id);
+      setZoneForm({
+        name: "Бонусная зона",
+        latitude: savedZone.latitude,
+        longitude: savedZone.longitude,
+        radius_meters: String(savedZone.radius_meters),
+        discount_percent: savedZone.discount_percent,
+        is_active: true,
+      });
+      setMessage("Бонусная зона сохранена");
+    } catch (error) {
+      setMessage(getErrorMessage(error));
+    }
   };
 
   const startEditingZone = (zone: BonusZone) => {
     setEditingZoneId(zone.id);
     setZoneForm({
-      name: zone.name,
+      name: "Бонусная зона",
       latitude: zone.latitude,
       longitude: zone.longitude,
       radius_meters: String(zone.radius_meters),
-      discount_percent: zone.discount_percent,
-      is_active: zone.is_active,
+      discount_percent: "10.00",
+      is_active: true,
     });
   };
 
@@ -2147,123 +2206,47 @@ function AdminDashboard({ token, user, onLogout }: { token: string; user: User; 
       )}
 
       {tab === "zones" && (
-        <section className="dashboard-grid">
+        <section className="dashboard-grid zones-layout">
           <div className="panel wide-panel">
-            <div className="hero-row">
-              <div>
-                <span className="eyebrow">Бонусные зоны</span>
-                <h2>Зоны возврата на карте</h2>
-              </div>
-              <span className="badge">Скидка при финише в зоне</span>
-            </div>
             <div className="map-stage admin-map">
+              {mapMessage && <p className="message map-message">{mapMessage}</p>}
               <FleetMap
                 cars={cars}
                 selectedCarId={selectedCarId}
                 onCarSelect={setSelectedCarId}
                 routeCar={null}
-                bonusZones={bonusZones}
+                bonusZones={bonusZonePreview ? [] : primaryBonusZone ? [primaryBonusZone] : []}
+                bonusZonePreview={bonusZonePreview}
                 onBonusZoneCenterChange={handleZoneCenterChange}
               />
             </div>
           </div>
 
           <div className="panel">
-            <span className="eyebrow">{editingZoneId ? "Редактирование" : "Создание"}</span>
-            <h2>{editingZoneId ? "Бонусная зона" : "Новая зона"}</h2>
-            <p className="helper-text">Кликните по карте, чтобы выбрать центр зоны. Пользователь увидит активные зоны на своей карте.</p>
+            <span className="eyebrow">Редактирование</span>
+            <h2>Бонусная зона</h2>
+            <p className="helper-text">Кликните по карте, затем задайте радиус.</p>
             <form className="form-stack" onSubmit={handleSaveBonusZone}>
-              <input
-                placeholder="Название зоны"
-                value={zoneForm.name}
-                onChange={(event) => setZoneForm((form) => ({ ...form, name: event.target.value }))}
-                required
-              />
-              <div className="two-columns">
+              <label>
+                Радиус, м
                 <input
-                  placeholder="Широта"
-                  value={zoneForm.latitude}
-                  onChange={(event) => setZoneForm((form) => ({ ...form, latitude: event.target.value }))}
-                  required
-                />
-                <input
-                  placeholder="Долгота"
-                  value={zoneForm.longitude}
-                  onChange={(event) => setZoneForm((form) => ({ ...form, longitude: event.target.value }))}
-                  required
-                />
-              </div>
-              <div className="two-columns">
-                <input
-                  placeholder="Радиус, м"
                   value={zoneForm.radius_meters}
                   onChange={(event) => setZoneForm((form) => ({ ...form, radius_meters: event.target.value }))}
+                  onKeyDown={(event) => {
+                    if (blockedNumberKeys.includes(event.key) || event.key === "-" || event.key === ".") event.preventDefault();
+                  }}
+                  type="number"
+                  inputMode="numeric"
+                  min="50"
+                  max="5000"
+                  step="10"
                   required
                 />
-                <input
-                  placeholder="Скидка, %"
-                  value={zoneForm.discount_percent}
-                  onChange={(event) => setZoneForm((form) => ({ ...form, discount_percent: event.target.value }))}
-                  required
-                />
-              </div>
-              <label className="checkbox-row">
-                <input
-                  type="checkbox"
-                  checked={zoneForm.is_active}
-                  onChange={(event) => setZoneForm((form) => ({ ...form, is_active: event.target.checked }))}
-                />
-                Активна для пользователей
               </label>
               <button className="primary-button" type="submit">
-                {editingZoneId ? "Сохранить зону" : "Создать зону"}
+                Сохранить зону
               </button>
-              {editingZoneId && (
-                <button
-                  className="ghost-button"
-                  type="button"
-                  onClick={() => {
-                    setEditingZoneId(null);
-                    setZoneForm(initialBonusZoneForm);
-                  }}
-                >
-                  Новая зона
-                </button>
-              )}
             </form>
-          </div>
-
-          <div className="panel">
-            <span className="eyebrow">Список</span>
-            <h2>Все зоны</h2>
-            <div className="simple-list section-content-offset">
-              {bonusZones.map((zone) => (
-                <div className="list-card" key={zone.id}>
-                  <div>
-                    <strong>{zone.name}</strong>
-                    <span>{zone.radius_meters} м · скидка {zone.discount_percent}%</span>
-                    <span>{zone.is_active ? "Активна" : "Скрыта"}</span>
-                  </div>
-                  <div className="button-row">
-                    <button className="ghost-button" type="button" onClick={() => startEditingZone(zone)}>
-                      Редактировать
-                    </button>
-                    <button
-                      className="ghost-button"
-                      type="button"
-                      onClick={() =>
-                        void runAction(
-                          () => api.adminUpdateBonusZone(token, zone.id, { is_active: !zone.is_active }),
-                          zone.is_active ? "Зона скрыта" : "Зона активирована",
-                        )
-                      }
-                    >
-                      {zone.is_active ? "Скрыть" : "Включить"}
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
           </div>
         </section>
       )}

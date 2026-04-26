@@ -47,9 +47,9 @@ export const initialCarForm: CarForm = {
 };
 
 export const initialBonusZoneForm: BonusZoneForm = {
-  name: "",
-  latitude: "55.751244",
-  longitude: "37.618423",
+  name: "Бонусная зона",
+  latitude: "",
+  longitude: "",
   radius_meters: "600",
   discount_percent: "10.00",
   is_active: true,
