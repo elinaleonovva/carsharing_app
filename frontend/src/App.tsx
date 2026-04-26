@@ -1,4 +1,4 @@
-// @ts-nocheck
+﻿// @ts-nocheck
 import { FormEvent, useEffect, useState } from "react";
 
 import { ApiError, Booking, BonusZone, Car, Tariff, TimeCoefficient, Trip, User, Wallet, api } from "./api";
@@ -1633,8 +1633,7 @@ function AdminDashboard({ token, user, onLogout }: { token: string; user: User; 
       <header className="topbar">
         <div>
           <span className="eyebrow">Администратор</span>
-          <h1>{user.email}</h1>
-          <p className="topbar-note">Разделы автопарка, заявок и тарифов вынесены в отдельные SPA-вкладки</p>
+          <h1>Панель администратора</h1>
         </div>
         <button className="ghost-button" type="button" onClick={onLogout}>
           Выйти
@@ -2225,7 +2224,7 @@ function AdminDashboard({ token, user, onLogout }: { token: string; user: User; 
           <div className="panel">
             <span className="eyebrow">Редактирование</span>
             <h2>Бонусная зона</h2>
-            <p className="helper-text">Кликните по карте, затем задайте радиус.</p>
+            <p className="helper-text">Нажмите на карту для выбора центра зоны, затем задайте радиус</p>
             <form className="form-stack" onSubmit={handleSaveBonusZone}>
               <label>
                 Радиус, м
