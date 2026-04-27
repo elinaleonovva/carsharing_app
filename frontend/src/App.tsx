@@ -453,14 +453,13 @@ function App() {
     <main className="app-shell">
       <section className="intro-panel">
         <div className="brand-row">
-          <span className="brand-mark">CS</span>
-          <span className="brand-name">CityDrive Moscow</span>
+          <span className="brand-mark">CP</span>
+          <span className="brand-name">Carsharing Platform</span>
         </div>
         <div className="intro-copy">
-          <h1>Каршеринг с картой, бронью и реальными маршрутами</h1>
+          <h1>Доступ к городскому автопарку</h1>
           <p>
-            Зарегистрируйтесь, дождитесь подтверждения аккаунта и управляйте поездкой
-            через карту Москвы: ставьте свою точку, выбирайте машину и начинайте маршрут.
+            Для доступа к сервису нужно зарегистрироваться и дождаться подтверждения аккаунта
           </p>
         </div>
       </section>
