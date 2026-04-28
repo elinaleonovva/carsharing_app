@@ -1,5 +1,5 @@
 import type { User } from "../utils/api";
-import { buildFullName } from "../utils/users";
+import { buildFullName, getVerificationStatusLabel } from "../utils/users";
 
 type AdminUsersSectionProps = {
   applications: User[];
@@ -50,7 +50,7 @@ export function AdminUsersSection({ applications, users, onApprove, onReject }: 
                 <strong>{item.full_name || buildFullName(item)}</strong>
                 <span>{item.email}</span>
                 <span>Телефон: {item.phone}</span>
-                <span>Статус заявки: {item.verification_status}</span>
+                <span>Статус заявки: {getVerificationStatusLabel(item.verification_status)}</span>
               </div>
             </div>
           ))}
