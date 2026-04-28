@@ -250,6 +250,41 @@ button:disabled {
   margin: 0 auto;
 }
 
+.auth-form {
+  gap: 18px;
+}
+
+.auth-field {
+  align-content: start;
+  min-width: 0;
+}
+
+.auth-two-columns {
+  align-items: start;
+}
+
+.auth-password-row {
+  display: grid;
+  gap: 18px;
+}
+
+.auth-input {
+  min-height: 52px;
+  padding: 0 16px;
+}
+
+.auth-feedback-shell {
+  min-height: 78px;
+}
+
+.auth-message {
+  width: min(100%, 720px);
+  margin-top: 0;
+  border-color: rgba(175, 90, 69, 0.18);
+  background: rgba(255, 248, 244, 0.95);
+  color: #7b3a2d;
+}
+
 .map-message {
   position: absolute;
   top: 24px;

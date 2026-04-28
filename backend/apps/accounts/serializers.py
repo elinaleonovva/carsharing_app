@@ -9,6 +9,7 @@ from .models import User
 
 PHONE_ALLOWED_RE = re.compile(r"^\d+$")
 DRIVER_LICENSE_SERIES_RE = re.compile(r"^[0-9A-Za-zА-Яа-яЁё]{4}$")
+PERSON_NAME_RE = re.compile(r"^[A-Za-zА-Яа-яЁё]+(?:[ -][A-Za-zА-Яа-яЁё]+)*$")
 
 
 def clean_message(message: str) -> str:
@@ -28,6 +29,20 @@ def validate_phone_number(value: str) -> str:
     return phone
 
 
+def validate_person_name(value: str, field_label: str) -> str:
+    normalized = re.sub(r"\s+", " ", value.strip())
+
+    if not normalized:
+        raise serializers.ValidationError(f"Введите {field_label}")
+
+    if not PERSON_NAME_RE.fullmatch(normalized):
+        raise serializers.ValidationError(
+            f"{field_label.capitalize()} может содержать только буквы, пробел и дефис"
+        )
+
+    return normalized
+
+
 def normalize_driver_license(value: str) -> str:
     compact = re.sub(r"\s+", "", value.strip()).upper()
 
@@ -40,10 +55,10 @@ def normalize_driver_license(value: str) -> str:
     if not DRIVER_LICENSE_SERIES_RE.fullmatch(series) or not number.isdigit():
         raise serializers.ValidationError("Введите номер водительского удостоверения в формате XX XX YYYYYY")
 
-    digit_count = sum(char.isdigit() for char in series)
-    letter_count = sum(char.isalpha() for char in series)
+    is_digit_series = bool(re.fullmatch(r"\d{4}", series))
+    is_mixed_series = bool(re.fullmatch(r"\d{2}[A-Za-zА-Яа-яЁё]{2}", series))
 
-    if not ((digit_count == 4 and letter_count == 0) or (digit_count == 2 and letter_count == 2)):
+    if not (is_digit_series or is_mixed_series):
         raise serializers.ValidationError("Серия ВУ должна содержать 4 цифры или 2 цифры и 2 буквы")
 
     return f"{series[:2]} {series[2:]} {number}"
@@ -120,6 +135,15 @@ class UserSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Пользователь с таким email уже зарегистрирован")
 
         return email
+
+    def validate_first_name(self, value):
+        return validate_person_name(value, "имя")
+
+    def validate_last_name(self, value):
+        return validate_person_name(value, "фамилию")
+
+    def validate_patronymic(self, value):
+        return validate_person_name(value, "отчество")
 
     def validate_phone(self, value):
         return validate_phone_number(value)
@@ -237,13 +261,13 @@ class RegisterSerializer(serializers.ModelSerializer):
         return email
 
     def validate_first_name(self, value):
-        return value.strip()
+        return validate_person_name(value, "имя")
 
     def validate_last_name(self, value):
-        return value.strip()
+        return validate_person_name(value, "фамилию")
 
     def validate_patronymic(self, value):
-        return value.strip()
+        return validate_person_name(value, "отчество")
 
     def validate_phone(self, value):
         return validate_phone_number(value)

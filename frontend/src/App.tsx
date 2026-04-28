@@ -99,6 +99,7 @@ const moneyFormatter = new Intl.NumberFormat("ru-RU", {
 });
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const personNamePattern = /^[A-Za-zА-Яа-яЁё]+(?:[ -][A-Za-zА-Яа-яЁё]+)*$/;
 const phonePattern = /^\d+$/;
 const driverLicenseSeriesPattern = /^[0-9A-Za-zА-Яа-яЁё]{4}$/;
 const licensePlatePattern = "^[АВЕКМНОРСТУХABEKMHOPCTYX][0-9]{3}[АВЕКМНОРСТУХABEKMHOPCTYX]{2}[0-9]{2,3}$";
@@ -169,8 +170,35 @@ function getErrorMessage(error: unknown): string {
   return "Не удалось выполнить запрос. Проверьте, что backend запущен и доступен.";
 }
 
+function normalizePersonNameInput(value: string): string {
+  return value.replace(/[^A-Za-zА-Яа-яЁё -]+/g, "").replace(/\s{2,}/g, " ");
+}
+
+function normalizePhoneInput(value: string): string {
+  return value.replace(/\D+/g, "").slice(0, 11);
+}
+
+function normalizeDriverLicenseInput(value: string): string {
+  const compact = value.replace(/[^0-9A-Za-zА-Яа-яЁё]+/g, "").toUpperCase().slice(0, 10);
+  const series = compact.slice(0, 4);
+  const number = compact.slice(4);
+
+  if (compact.length <= 2) {
+    return compact;
+  }
+
+  if (compact.length <= 4) {
+    return `${series.slice(0, 2)} ${series.slice(2)}`;
+  }
+
+  return `${series.slice(0, 2)} ${series.slice(2)} ${number}`.trim();
+}
+
 function validateAuthForm(mode: AuthMode, form: AuthForm): string | null {
   const email = form.email.trim().toLowerCase();
+  const firstName = form.first_name.trim();
+  const lastName = form.last_name.trim();
+  const patronymic = form.patronymic.trim();
   const license = form.driver_license_number.replace(/\s+/g, "").toUpperCase();
 
   if (!email) return "Введите email";
@@ -180,9 +208,12 @@ function validateAuthForm(mode: AuthMode, form: AuthForm): string | null {
     return form.password.trim() ? null : "Введите пароль";
   }
 
-  if (!form.last_name.trim()) return "Введите фамилию";
-  if (!form.first_name.trim()) return "Введите имя";
-  if (!form.patronymic.trim()) return "Введите отчество";
+  if (!lastName) return "Введите фамилию";
+  if (!personNamePattern.test(lastName)) return "Фамилия может содержать только буквы, пробел и дефис";
+  if (!firstName) return "Введите имя";
+  if (!personNamePattern.test(firstName)) return "Имя может содержать только буквы, пробел и дефис";
+  if (!patronymic) return "Введите отчество";
+  if (!personNamePattern.test(patronymic)) return "Отчество может содержать только буквы, пробел и дефис";
   if (!form.phone.trim()) return "Введите номер телефона";
   if (!phonePattern.test(form.phone.trim())) return "Телефон должен содержать только цифры";
   if (form.phone.trim().length !== 11) return "Телефон должен содержать 11 цифр";
@@ -191,13 +222,13 @@ function validateAuthForm(mode: AuthMode, form: AuthForm): string | null {
 
   const series = license.slice(0, 4);
   const number = license.slice(4);
-  const digits = [...series].filter((char) => /\d/.test(char)).length;
-  const letters = [...series].filter((char) => /[A-Za-zА-Яа-яЁё]/.test(char)).length;
+  const isDigitSeries = /^\d{4}$/.test(series);
+  const isMixedSeries = /^\d{2}[A-Za-zА-Яа-яЁё]{2}$/.test(series);
 
   if (!driverLicenseSeriesPattern.test(series) || !/^\d{6}$/.test(number)) {
     return "Введите номер ВУ в формате XX XX YYYYYY";
   }
-  if (!((digits === 4 && letters === 0) || (digits === 2 && letters === 2))) {
+  if (!(isDigitSeries || isMixedSeries)) {
     return "Серия ВУ должна содержать 4 цифры или 2 цифры и 2 буквы";
   }
   if (!form.password.trim()) return "Введите пароль";
@@ -383,6 +414,10 @@ function App() {
       .finally(() => setIsLoading(false));
   }, [token]);
 
+  const updateAuthForm = (field: keyof AuthForm, value: string) => {
+    setAuthForm((form) => ({ ...form, [field]: value }));
+  };
+
   const handleAuthSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setMessage("");
@@ -406,11 +441,11 @@ function App() {
               email: authForm.email.trim().toLowerCase(),
               password: authForm.password,
               password_confirm: authForm.password_confirm,
-              first_name: authForm.first_name.trim(),
-              last_name: authForm.last_name.trim(),
-              patronymic: authForm.patronymic.trim(),
-              phone: authForm.phone.trim(),
-              driver_license_number: authForm.driver_license_number.trim(),
+              first_name: authForm.first_name.trim().replace(/\s+/g, " "),
+              last_name: authForm.last_name.trim().replace(/\s+/g, " "),
+              patronymic: authForm.patronymic.trim().replace(/\s+/g, " "),
+              phone: normalizePhoneInput(authForm.phone),
+              driver_license_number: normalizeDriverLicenseInput(authForm.driver_license_number),
             });
 
       localStorage.setItem(TOKEN_KEY, response.token);
@@ -489,104 +524,109 @@ function App() {
             </button>
           </div>
 
-          <form className="form-stack" onSubmit={handleAuthSubmit}>
-            <label>
+          <form className="form-stack auth-form" onSubmit={handleAuthSubmit} noValidate>
+            <label className="auth-field">
               Email
               <input
+                className="auth-input"
                 value={authForm.email}
-                onChange={(event) => setAuthForm((form) => ({ ...form, email: event.target.value }))}
+                onChange={(event) => updateAuthForm("email", event.target.value.trimStart())}
                 type="email"
                 placeholder="name@example.com"
+                autoCapitalize="off"
+                autoCorrect="off"
+                spellCheck={false}
                 required
               />
             </label>
 
             {mode === "register" && (
               <>
-                <div className="two-columns">
-                  <label>
+                <div className="two-columns auth-two-columns">
+                  <label className="auth-field">
                     Фамилия
                     <input
+                      className="auth-input"
                       value={authForm.last_name}
-                      onChange={(event) =>
-                        setAuthForm((form) => ({ ...form, last_name: event.target.value }))
-                      }
+                      onChange={(event) => updateAuthForm("last_name", normalizePersonNameInput(event.target.value))}
+                      maxLength={150}
                       required
                     />
                   </label>
-                  <label>
+                  <label className="auth-field">
                     Имя
                     <input
+                      className="auth-input"
                       value={authForm.first_name}
-                      onChange={(event) =>
-                        setAuthForm((form) => ({ ...form, first_name: event.target.value }))
-                      }
+                      onChange={(event) => updateAuthForm("first_name", normalizePersonNameInput(event.target.value))}
+                      maxLength={150}
                       required
                     />
                   </label>
                 </div>
-                <label>
+                <label className="auth-field">
                   Отчество
                   <input
+                    className="auth-input"
                     value={authForm.patronymic}
-                    onChange={(event) =>
-                      setAuthForm((form) => ({ ...form, patronymic: event.target.value }))
-                    }
+                    onChange={(event) => updateAuthForm("patronymic", normalizePersonNameInput(event.target.value))}
+                    maxLength={150}
                     required
                   />
                 </label>
-                <label>
+                <label className="auth-field">
                   Телефон
                   <input
+                    className="auth-input"
                     value={authForm.phone}
-                    onChange={(event) =>
-                      setAuthForm((form) => ({ ...form, phone: event.target.value }))
-                    }
+                    onChange={(event) => updateAuthForm("phone", normalizePhoneInput(event.target.value))}
                     placeholder="79990001122"
+                    inputMode="numeric"
+                    autoComplete="tel"
+                    maxLength={11}
                     required
                   />
                 </label>
-                <label>
+                <label className="auth-field">
                   Номер водительского удостоверения
                   <input
+                    className="auth-input"
                     value={authForm.driver_license_number}
                     onChange={(event) =>
-                      setAuthForm((form) => ({
-                        ...form,
-                        driver_license_number: event.target.value,
-                      }))
+                      updateAuthForm("driver_license_number", normalizeDriverLicenseInput(event.target.value))
                     }
                     placeholder="12 34 123456"
+                    autoCapitalize="characters"
+                    autoCorrect="off"
+                    spellCheck={false}
+                    maxLength={13}
                     required
                   />
                 </label>
               </>
             )}
 
-            <div className="two-columns">
-              <label>
+            <div className={mode === "register" ? "two-columns auth-two-columns" : "auth-password-row"}>
+              <label className="auth-field">
                 Пароль
                 <input
+                  className="auth-input"
                   value={authForm.password}
-                  onChange={(event) =>
-                    setAuthForm((form) => ({ ...form, password: event.target.value }))
-                  }
+                  onChange={(event) => updateAuthForm("password", event.target.value)}
                   type="password"
+                  autoComplete={mode === "login" ? "current-password" : "new-password"}
                   required
                 />
               </label>
               {mode === "register" && (
-                <label>
+                <label className="auth-field">
                   Повтор пароля
                   <input
+                    className="auth-input"
                     value={authForm.password_confirm}
-                    onChange={(event) =>
-                      setAuthForm((form) => ({
-                        ...form,
-                        password_confirm: event.target.value,
-                      }))
-                    }
+                    onChange={(event) => updateAuthForm("password_confirm", event.target.value)}
                     type="password"
+                    autoComplete="new-password"
                     required
                   />
                 </label>
@@ -599,7 +639,9 @@ function App() {
           </form>
         </div>
 
-        {message && <p className="message">{message}</p>}
+        <div className="auth-feedback-shell">
+          {message && <p className="message auth-message">{message}</p>}
+        </div>
       </section>
     </main>
   );
