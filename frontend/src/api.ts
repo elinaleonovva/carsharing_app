@@ -239,6 +239,11 @@ export const api = {
       token,
       body,
     }),
+  adminDeleteCar: (token: string, carId: number) =>
+    request<void>(`/admin/cars/${carId}/`, {
+      method: "DELETE",
+      token,
+    }),
   adminTariff: (token: string) => request<Tariff>("/admin/tariff/", { token }),
   adminUpdateTariff: (token: string, body: unknown) =>
     request<Tariff>("/admin/tariff/", {

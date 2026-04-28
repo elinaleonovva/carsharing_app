@@ -1655,6 +1655,18 @@ function AdminDashboard({ token, user, onLogout }: { token: string; user: User; 
     });
   };
 
+  const handleDeleteCar = (car: Car) => {
+    void runAction(
+      async () => {
+        await api.adminDeleteCar(token, car.id);
+        if (editingCarId === car.id) {
+          resetCarForm();
+        }
+      },
+      "Автомобиль удален из автопарка",
+    );
+  };
+
   const updateCoefficientField = (coefficientId: number, field: keyof TimeCoefficient, value: string) => {
     setCoefficients((current) =>
       current.map((coefficient) =>
@@ -2283,8 +2295,19 @@ function AdminDashboard({ token, user, onLogout }: { token: string; user: User; 
                     </div>
                     <div className="button-row">
                       <strong>{formatMoney(car.price_per_minute)} / мин</strong>
-                      <button className="ghost-button" type="button" onClick={() => startEditingCar(car)}>
+                      <button
+                        className="ghost-button small-action-button"
+                        type="button"
+                        onClick={() => startEditingCar(car)}
+                      >
                         Редактировать
+                      </button>
+                      <button
+                        className="ghost-button small-action-button danger-action-button"
+                        type="button"
+                        onClick={() => handleDeleteCar(car)}
+                      >
+                        Удалить
                       </button>
                     </div>
                   </div>

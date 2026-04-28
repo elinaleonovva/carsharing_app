@@ -242,6 +242,18 @@ class AdminCarDetailAPIView(APIView):
         car = serializer.save()
         return Response(CarSerializer(car).data)
 
+    def delete(self, request, pk):
+        car = Car.objects.get(pk=pk)
+
+        if car.bookings.exists() or car.trips.exists():
+            return Response(
+                {"detail": "Нельзя удалить автомобиль, у которого уже есть брони или поездки"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        car.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
 
 class AdminBookingsAPIView(APIView):
     permission_classes = [IsAdminRole]

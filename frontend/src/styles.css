@@ -267,6 +267,18 @@ input[type="number"]::-webkit-outer-spin-button {
   background: rgba(255, 255, 255, 0.9);
 }
 
+.small-action-button {
+  min-height: 38px;
+  padding: 0 12px;
+  border-radius: 12px;
+  font-size: 13px;
+}
+
+.danger-action-button {
+  border-color: rgba(175, 90, 69, 0.24);
+  color: #8b4334;
+}
+
 button:disabled {
   cursor: not-allowed;
   opacity: 0.6;
