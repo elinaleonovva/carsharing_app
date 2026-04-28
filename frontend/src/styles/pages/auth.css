@@ -5,9 +5,17 @@
 }
 
 .auth-shell {
-  min-height: 100svh;
-  height: 100svh;
-  overflow: clip;
+  min-height: 100dvh;
+  height: 100dvh;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.app-shell.auth-shell {
+  height: 100dvh;
+  min-height: 100dvh;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 .intro-panel {
@@ -147,4 +155,89 @@
   border-color: rgba(175, 90, 69, 0.18);
   background: rgba(255, 248, 244, 0.95);
   color: #7b3a2d;
+}
+
+@media (max-width: 760px) {
+  .app-shell.auth-shell {
+    grid-template-columns: 1fr;
+    align-content: start;
+    height: 100dvh;
+    min-height: 100dvh;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .auth-shell .intro-panel {
+    min-height: auto;
+    padding: 20px 16px 12px;
+    overflow: visible;
+  }
+
+  .auth-shell .work-panel {
+    align-content: start;
+    padding: 8px 14px 18px;
+    overflow: visible;
+  }
+
+  .auth-shell .auth-card,
+  .auth-shell .auth-card--compact {
+    width: 100%;
+    max-height: none;
+    overflow: visible;
+    padding: 18px 16px;
+    border-radius: 20px;
+  }
+
+  .auth-shell .mode-switch {
+    margin-bottom: 14px;
+    padding: 6px;
+  }
+
+  .auth-shell .mode-switch button {
+    min-height: 42px;
+  }
+
+  .auth-shell .auth-form {
+    gap: 12px;
+  }
+
+  .auth-shell .auth-input {
+    min-height: 46px;
+  }
+
+  .auth-shell .two-columns,
+  .auth-shell .auth-two-columns {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+}
+
+@media (max-width: 420px) {
+  .app-shell.auth-shell {
+    height: 100dvh;
+    min-height: 100dvh;
+    overflow-y: auto;
+  }
+
+  .auth-shell .intro-panel {
+    padding: 16px 12px 10px;
+  }
+
+  .auth-shell .intro-panel h1 {
+    font-size: clamp(24px, 8vw, 30px);
+  }
+
+  .auth-shell .intro-panel p {
+    font-size: 14px;
+  }
+
+  .auth-shell .work-panel {
+    padding: 6px 10px 14px;
+  }
+
+  .auth-shell .auth-card,
+  .auth-shell .auth-card--compact {
+    padding: 16px 12px;
+    border-radius: 16px;
+  }
 }
