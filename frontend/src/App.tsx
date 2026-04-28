@@ -30,7 +30,6 @@ type CarForm = {
   brand: string;
   model: string;
   license_plate: string;
-  status: string;
   latitude: string;
   longitude: string;
   price_per_minute: string;
@@ -120,7 +119,6 @@ const initialCarForm: CarForm = {
   brand: "",
   model: "",
   license_plate: "",
-  status: "available",
   latitude: "55.751244",
   longitude: "37.618423",
   price_per_minute: "12.00",
@@ -1584,7 +1582,6 @@ function AdminDashboard({ token, user, onLogout }: { token: string; user: User; 
     brand: carForm.brand,
     model: carForm.model,
     license_plate: carForm.license_plate,
-    status: carForm.status,
     latitude: carForm.latitude,
     longitude: carForm.longitude,
     price_per_minute: carForm.price_per_minute,
@@ -1648,7 +1645,6 @@ function AdminDashboard({ token, user, onLogout }: { token: string; user: User; 
       brand: car.brand,
       model: car.model,
       license_plate: car.license_plate,
-      status: car.status,
       latitude: car.latitude,
       longitude: car.longitude,
       price_per_minute: car.price_per_minute,
@@ -2181,16 +2177,6 @@ function AdminDashboard({ token, user, onLogout }: { token: string; user: User; 
                   required
                 />
               </label>
-              <label>
-                Статус
-                <select value={carForm.status} onChange={(event) => setCarForm((form) => ({ ...form, status: event.target.value }))}>
-                  <option value="available">Доступен</option>
-                  <option value="booked">Забронирован</option>
-                  <option value="in_trip">В поездке</option>
-                  <option value="service">На обслуживании</option>
-                  <option value="inactive">Неактивен</option>
-                </select>
-              </label>
               <div className="two-columns">
                 <label>
                   Широта
@@ -2291,7 +2277,6 @@ function AdminDashboard({ token, user, onLogout }: { token: string; user: User; 
                         {car.brand} {car.model}
                       </strong>
                       <span>{car.license_plate}</span>
-                      <span>{car.status_label}</span>
                     </div>
                     <div className="button-row">
                       <strong>{formatMoney(car.price_per_minute)} / мин</strong>

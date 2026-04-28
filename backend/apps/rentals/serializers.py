@@ -38,7 +38,7 @@ class CarSerializer(serializers.ModelSerializer):
             "price_per_minute",
             "created_at",
         )
-        read_only_fields = ("id", "status_label", "created_at")
+        read_only_fields = ("id", "status", "status_label", "created_at")
 
     def validate_license_plate(self, value):
         license_plate = re.sub(r"[\s-]+", "", value.strip()).upper()
