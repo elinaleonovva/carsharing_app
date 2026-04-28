@@ -435,6 +435,15 @@ function App() {
       .finally(() => setIsLoading(false));
   }, [token]);
 
+  useEffect(() => {
+    if (!message) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => setMessage(""), 12000);
+    return () => window.clearTimeout(timer);
+  }, [message]);
+
   const updateAuthForm = (field: keyof AuthForm, value: string) => {
     setAuthForm((form) => ({ ...form, [field]: value }));
   };

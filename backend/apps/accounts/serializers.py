@@ -225,9 +225,18 @@ class RegisterSerializer(serializers.ModelSerializer):
 
     def validate_email(self, value):
         email = value.strip().lower()
-        if User.objects.filter(email__iexact=email).exists():
-            raise serializers.ValidationError("Пользователь с таким email уже зарегистрирован")
-        return email
+        existing_user = User.objects.filter(email__iexact=email).first()
+
+        if existing_user is None:
+            return email
+
+        if (
+            existing_user.role == User.Role.USER
+            and existing_user.verification_status == User.VerificationStatus.REJECTED
+        ):
+            return email
+
+        raise serializers.ValidationError("Пользователь с таким email уже зарегистрирован")
 
     def validate_first_name(self, value):
         return validate_person_name(value, "имя")
@@ -243,15 +252,37 @@ class RegisterSerializer(serializers.ModelSerializer):
 
     def validate_driver_license_number(self, value):
         driver_license_number = normalize_driver_license(value)
-        if User.objects.filter(driver_license_number=driver_license_number).exists():
+        queryset = User.objects.filter(driver_license_number=driver_license_number)
+        email = str(self.initial_data.get("email", "")).strip().lower()
+
+        if email:
+            queryset = queryset.exclude(
+                email__iexact=email,
+                role=User.Role.USER,
+                verification_status=User.VerificationStatus.REJECTED,
+            )
+
+        if queryset.exists():
             raise serializers.ValidationError("Пользователь с таким водительским удостоверением уже зарегистрирован")
         return driver_license_number
 
     def create(self, validated_data):
         validated_data.pop("password_confirm")
         password = validated_data.pop("password")
-        user = User(**validated_data)
+        user = User.objects.filter(
+            email__iexact=validated_data["email"],
+            role=User.Role.USER,
+            verification_status=User.VerificationStatus.REJECTED,
+        ).first()
+
+        if user is None:
+            user = User(**validated_data)
+        else:
+            for field, value in validated_data.items():
+                setattr(user, field, value)
+
         user.verification_status = User.VerificationStatus.PENDING
+        user.is_blocked = False
         user.set_password(password)
         user.save()
         return user
@@ -282,6 +313,10 @@ class LoginSerializer(serializers.Serializer):
             raise serializers.ValidationError({"email": "Пользователь с таким email не зарегистрирован"})
         if user.verification_status == User.VerificationStatus.PENDING:
             raise serializers.ValidationError({"email": "Заявка еще не подтверждена администратором"})
+        if user.verification_status == User.VerificationStatus.REJECTED:
+            raise serializers.ValidationError(
+                {"email": "Заявка отклонена. Проверьте введенные данные и отправьте новую заявку"}
+            )
         if not user.check_password(password):
             raise serializers.ValidationError({"password": "Неверный пароль"})
         if user.is_blocked:
