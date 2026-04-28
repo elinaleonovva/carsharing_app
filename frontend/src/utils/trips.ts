@@ -1,4 +1,4 @@
-import type { Booking, Trip } from "../api";
+import type { Booking, Trip } from "./api";
 import { BOOKING_TTL_MS } from "../constants";
 import type { Coordinates } from "../types";
 

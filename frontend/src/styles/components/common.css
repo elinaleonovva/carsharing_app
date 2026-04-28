@@ -1,0 +1,134 @@
+.auth-card,
+.status-card,
+.panel,
+.topbar,
+.tabbar,
+.message,
+.loading-banner {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  backdrop-filter: blur(16px);
+  box-shadow: var(--shadow);
+}
+
+.auth-card,
+.status-card {
+  width: min(100%, 720px);
+  margin: 0 auto;
+  padding: 32px;
+  border-radius: 28px;
+}
+
+.mode-switch {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  margin-bottom: 26px;
+  padding: 8px;
+  border-radius: 22px;
+  background: rgba(18, 55, 47, 0.06);
+}
+
+.mode-switch button,
+.tabbar button {
+  min-height: 46px;
+  border: 0;
+  border-radius: 16px;
+  color: #4b5e58;
+  background: transparent;
+  font-weight: 800;
+}
+
+.mode-switch button.active,
+.tabbar button.active {
+  color: #14352f;
+  background: var(--surface-strong);
+  box-shadow: 0 12px 32px rgba(26, 60, 52, 0.1);
+}
+
+.form-stack {
+  display: grid;
+  gap: 16px;
+}
+
+.two-columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+label {
+  display: grid;
+  gap: 8px;
+  color: #42544f;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+input[type="number"] {
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  margin: 0;
+  -webkit-appearance: none;
+}
+
+.primary-button,
+.secondary-button,
+.ghost-button {
+  min-height: 48px;
+  padding: 0 18px;
+  border-radius: 16px;
+  font-weight: 800;
+}
+
+.primary-button {
+  border: 1px solid rgba(23, 76, 67, 0.95);
+  color: #fffdf7;
+  background: #174c43;
+}
+
+.secondary-button {
+  border: 1px solid rgba(232, 199, 103, 0.92);
+  color: #3b2d0b;
+  background: #e8c767;
+}
+
+.ghost-button {
+  border: 1px solid rgba(22, 48, 43, 0.12);
+  color: #233934;
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.small-action-button {
+  min-height: 38px;
+  padding: 0 12px;
+  border-radius: 12px;
+  font-size: 13px;
+}
+
+.danger-action-button {
+  border-color: rgba(175, 90, 69, 0.24);
+  color: #8b4334;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.message,
+.loading-banner {
+  border-radius: 22px;
+  padding: 14px 18px;
+  color: #234039;
+}
+
+.message {
+  width: min(100%, 960px);
+  margin: 0 auto;
+}
+

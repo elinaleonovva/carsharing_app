@@ -1,4 +1,4 @@
-import type { Car } from "../api";
+import type { Car } from "./api";
 import { MKAD_POLYGON } from "../constants";
 import type { Coordinates } from "../types";
 

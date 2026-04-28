@@ -4,6 +4,8 @@ export const TOKEN_KEY = "carsharing_token";
 export const BOOKING_TTL_MS = 15 * 60 * 1000;
 export const MAP_MESSAGE_TIMEOUT_MS = 10_000;
 export const MOSCOW_CENTER: Coordinates = [55.751244, 37.618423];
+export const licensePlatePattern = "^[АВЕКМНОРСТУХABEKMHOPCTYX][0-9]{3}[АВЕКМНОРСТУХABEKMHOPCTYX]{2}[0-9]{2,3}$";
+export const blockedNumberKeys = ["e", "E", "+"];
 
 export const MKAD_POLYGON: Coordinates[] = [
   [55.9115, 37.545],

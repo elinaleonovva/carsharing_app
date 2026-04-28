@@ -1,0 +1,150 @@
+.app-shell {
+  display: grid;
+  grid-template-columns: minmax(360px, 0.92fr) minmax(460px, 1.08fr);
+  min-height: 100vh;
+}
+
+.auth-shell {
+  min-height: 100svh;
+  height: 100svh;
+  overflow: clip;
+}
+
+.intro-panel {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  gap: 24px;
+  padding: 56px;
+  color: var(--text);
+  background: #f8e6c3;
+}
+
+.brand-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font-weight: 800;
+}
+
+.brand-mark {
+  display: grid;
+  width: 46px;
+  height: 46px;
+  place-items: center;
+  border-radius: 14px;
+  color: #17322b;
+  background: #f0c856;
+}
+
+.brand-name {
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.intro-copy {
+  display: grid;
+  align-content: center;
+  gap: 18px;
+  max-width: 640px;
+}
+
+.intro-panel h1 {
+  margin: 0;
+  font-size: clamp(40px, 5vw, 74px);
+  line-height: 0.94;
+}
+
+.intro-panel p {
+  max-width: 430px;
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 18px;
+  line-height: 1.65;
+}
+
+.work-panel {
+  display: grid;
+  align-content: center;
+  gap: 20px;
+  padding: 48px;
+}
+
+.auth-shell .intro-panel {
+  gap: 18px;
+  padding: 40px 48px;
+}
+
+.auth-shell .intro-copy {
+  gap: 14px;
+}
+
+.auth-shell .intro-panel h1 {
+  font-size: clamp(34px, 4.5vw, 62px);
+}
+
+.auth-shell .intro-panel p {
+  font-size: 17px;
+  line-height: 1.55;
+}
+
+.auth-shell .work-panel {
+  min-height: 0;
+  gap: 14px;
+  padding: 24px 40px 12px;
+}
+
+.auth-shell .auth-card:not(.auth-card--compact) {
+  transform: translateY(18px);
+}
+
+
+.auth-form {
+  gap: 18px;
+}
+
+.auth-field {
+  align-content: start;
+  min-width: 0;
+}
+
+.auth-two-columns {
+  align-items: start;
+}
+
+.auth-card--compact {
+  padding: 24px 28px;
+}
+
+.auth-card--compact .mode-switch {
+  margin-bottom: 18px;
+}
+
+.auth-card--compact .auth-form {
+  gap: 14px;
+}
+
+.auth-card--compact label {
+  gap: 6px;
+}
+
+.auth-password-row {
+  display: grid;
+  gap: 18px;
+}
+
+.auth-input {
+  min-height: 52px;
+  padding: 0 16px;
+}
+
+.auth-feedback-shell {
+  min-height: 54px;
+}
+
+.auth-message {
+  width: min(100%, 720px);
+  margin-top: 0;
+  border-color: rgba(175, 90, 69, 0.18);
+  background: rgba(255, 248, 244, 0.95);
+  color: #7b3a2d;
+}

@@ -1,4 +1,4 @@
-import type { BonusZone, Car } from "./api";
+import type { BonusZone, Car } from "./utils/api";
 
 export type Coordinates = [number, number];
 export type AuthMode = "login" | "register";

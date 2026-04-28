@@ -1,4 +1,4 @@
-import type { Car, User } from "../api";
+import type { Car, User } from "./api";
 
 export function buildFullName(user: User): string {
   return [user.last_name, user.first_name, user.patronymic].filter(Boolean).join(" ");

@@ -1,4 +1,4 @@
-import { ApiError } from "../api";
+import { ApiError } from "./api";
 
 function normalizeMessage(message: string): string {
   return message.trim().replace(/[.!?]+$/u, "");

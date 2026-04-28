@@ -1,0 +1,65 @@
+:root {
+  color: #16302b;
+  background: #f8e6c3;
+  font-family:
+    "Segoe UI",
+    "Trebuchet MS",
+    sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  --surface: rgba(255, 255, 255, 0.84);
+  --surface-strong: rgba(255, 255, 255, 0.94);
+  --border: rgba(22, 48, 43, 0.12);
+  --shadow: 0 20px 60px rgba(30, 52, 45, 0.12);
+  --green: #174c43;
+  --green-soft: #1d6b57;
+  --gold: #e8c767;
+  --text: #16302b;
+  --text-muted: #60736d;
+  --danger: #af5a45;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  background: #f8e6c3;
+}
+
+button,
+input,
+select {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+input,
+select {
+  width: 100%;
+  min-height: 48px;
+  padding: 0 14px;
+  border: 1px solid rgba(22, 48, 43, 0.16);
+  border-radius: 16px;
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.96);
+  outline: none;
+}
+
+input:focus,
+select:focus {
+  border-color: rgba(29, 107, 87, 0.7);
+  box-shadow: 0 0 0 4px rgba(29, 107, 87, 0.14);
+}
+

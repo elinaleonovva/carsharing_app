@@ -1,4 +1,4 @@
-import type { User } from "../api";
+import type { User } from "../utils/api";
 
 type WaitingScreenProps = {
   user: User;
