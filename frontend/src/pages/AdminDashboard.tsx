@@ -5,6 +5,9 @@ import { AdminUsersSection } from "../components/AdminUsersSection";
 import { CarList } from "../components/CarList";
 import { FleetMap } from "../components/FleetMap";
 import { TabBar } from "../components/TabBar";
+import { useAutoDismissMessage } from "../hooks/useAutoDismissMessage";
+import { useCurrentTime } from "../hooks/useCurrentTime";
+import { usePolling } from "../hooks/usePolling";
 import {
   blockedNumberKeys,
   initialBonusZoneForm,
@@ -50,7 +53,7 @@ export function AdminDashboard({ token, user, onLogout }: { token: string; user:
   const [mapMessage, setMapMessage] = useState("");
   const [walletMessage, setWalletMessage] = useState("");
   const [activityMessage, setActivityMessage] = useState("");
-  const [now, setNow] = useState(Date.now());
+  const now = useCurrentTime();
   const [isRefreshing, setIsRefreshing] = useState(true);
   const [message, setMessage] = useState("");
 
@@ -154,27 +157,8 @@ export function AdminDashboard({ token, user, onLogout }: { token: string; user:
     void loadAdminData(true);
   }, [token]);
 
-  useEffect(() => {
-    const dataTimer = window.setInterval(() => {
-      void loadAdminData();
-    }, 30000);
-
-    return () => window.clearInterval(dataTimer);
-  }, [token]);
-
-  useEffect(() => {
-    const timer = window.setInterval(() => setNow(Date.now()), 1000);
-    return () => window.clearInterval(timer);
-  }, []);
-
-  useEffect(() => {
-    if (!mapMessage) {
-      return;
-    }
-
-    const timer = window.setTimeout(() => setMapMessage(""), 10000);
-    return () => window.clearTimeout(timer);
-  }, [mapMessage]);
+  usePolling(() => void loadAdminData(), 30000, [token]);
+  useAutoDismissMessage(mapMessage, setMapMessage, 10000);
 
   useEffect(() => {
     if (adminBooking && bookingSecondsLeft === 0) {
@@ -190,14 +174,7 @@ export function AdminDashboard({ token, user, onLogout }: { token: string; user:
     startEditingZone(primaryBonusZone);
   }, [tab, primaryBonusZone?.id, zoneForm.latitude, zoneForm.longitude]);
 
-  useEffect(() => {
-    if (!message) {
-      return;
-    }
-
-    const timer = window.setTimeout(() => setMessage(""), 10000);
-    return () => window.clearTimeout(timer);
-  }, [message]);
+  useAutoDismissMessage(message, setMessage, 10000);
 
   const runAction = async (action: () => Promise<unknown>, successText: string) => {
     setMessage("");

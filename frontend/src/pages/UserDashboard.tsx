@@ -3,6 +3,9 @@ import { useEffect, useState } from "react";
 
 import { FleetMap } from "../components/FleetMap";
 import { TabBar } from "../components/TabBar";
+import { useAutoDismissMessage } from "../hooks/useAutoDismissMessage";
+import { useCurrentTime } from "../hooks/useCurrentTime";
+import { usePolling } from "../hooks/usePolling";
 import type { Coordinates, RouteSummary, UserTab } from "../types";
 import type { Booking, BonusZone, Car, Trip, User, Wallet } from "../utils/api";
 import { api } from "../utils/api";
@@ -33,7 +36,7 @@ export function UserDashboard({ token, user, onLogout }: { token: string; user: 
   const [mapMessage, setMapMessage] = useState("");
   const [walletMessage, setWalletMessage] = useState("");
   const [activityMessage, setActivityMessage] = useState("");
-  const [now, setNow] = useState(Date.now());
+  const now = useCurrentTime();
   const [isRefreshing, setIsRefreshing] = useState(true);
 
   const selectedCar = cars.find((car) => car.id === selectedCarId) ?? null;
@@ -91,27 +94,8 @@ export function UserDashboard({ token, user, onLogout }: { token: string; user: 
     void loadData(true);
   }, [token]);
 
-  useEffect(() => {
-    const dataTimer = window.setInterval(() => {
-      void loadData();
-    }, 30000);
-
-    return () => window.clearInterval(dataTimer);
-  }, [token]);
-
-  useEffect(() => {
-    const timer = window.setInterval(() => setNow(Date.now()), 1000);
-    return () => window.clearInterval(timer);
-  }, []);
-
-  useEffect(() => {
-    if (!mapMessage) {
-      return;
-    }
-
-    const timer = window.setTimeout(() => setMapMessage(""), 10000);
-    return () => window.clearTimeout(timer);
-  }, [mapMessage]);
+  usePolling(() => void loadData(), 30000, [token]);
+  useAutoDismissMessage(mapMessage, setMapMessage, 10000);
 
   useEffect(() => {
     if (booking && bookingSecondsLeft === 0) {
