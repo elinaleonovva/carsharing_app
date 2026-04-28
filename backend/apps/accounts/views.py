@@ -20,11 +20,10 @@ class RegisterAPIView(APIView):
         serializer = RegisterSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
-        token, _ = Token.objects.get_or_create(user=user)
 
         return Response(
             {
-                "token": token.key,
+                "detail": "Заявка отправлена. Дождитесь подтверждения администратора, затем выполните вход.",
                 "user": UserSerializer(user).data,
             },
             status=status.HTTP_201_CREATED,

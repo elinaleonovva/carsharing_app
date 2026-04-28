@@ -1,7 +1,5 @@
 import re
 
-from django.contrib.auth.password_validation import validate_password
-from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 
 from .models import User
@@ -62,26 +60,6 @@ def normalize_driver_license(value: str) -> str:
         raise serializers.ValidationError("Серия ВУ должна содержать 4 цифры или 2 цифры и 2 буквы")
 
     return f"{series[:2]} {series[2:]} {number}"
-
-
-def translate_password_errors(exc: DjangoValidationError) -> list[str]:
-    translated_messages = []
-
-    for message in exc.messages:
-        lowered = message.lower()
-
-        if "too short" in lowered:
-            translated_messages.append("Пароль должен содержать не менее 8 символов")
-        elif "too common" in lowered:
-            translated_messages.append("Пароль слишком простой")
-        elif "entirely numeric" in lowered:
-            translated_messages.append("Пароль не должен состоять только из цифр")
-        elif "too similar" in lowered:
-            translated_messages.append("Пароль слишком похож на логин или личные данные")
-        else:
-            translated_messages.append(clean_message(message))
-
-    return translated_messages
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -173,20 +151,16 @@ class RegisterSerializer(serializers.ModelSerializer):
     )
     password = serializers.CharField(
         write_only=True,
-        min_length=8,
         error_messages={
             "blank": "Введите пароль",
             "required": "Введите пароль",
-            "min_length": "Пароль должен содержать не менее 8 символов",
         },
     )
     password_confirm = serializers.CharField(
         write_only=True,
-        min_length=8,
         error_messages={
             "blank": "Повторите пароль",
             "required": "Повторите пароль",
-            "min_length": "Пароль должен содержать не менее 8 символов",
         },
     )
     first_name = serializers.CharField(
@@ -247,11 +221,6 @@ class RegisterSerializer(serializers.ModelSerializer):
         if attrs["password"] != attrs["password_confirm"]:
             raise serializers.ValidationError({"password_confirm": "Пароли не совпадают"})
 
-        try:
-            validate_password(attrs["password"])
-        except DjangoValidationError as exc:
-            raise serializers.ValidationError({"password": translate_password_errors(exc)}) from exc
-
         return attrs
 
     def validate_email(self, value):
@@ -311,6 +280,8 @@ class LoginSerializer(serializers.Serializer):
         user = User.objects.filter(email__iexact=email).first()
         if user is None:
             raise serializers.ValidationError({"email": "Пользователь с таким email не зарегистрирован"})
+        if user.verification_status == User.VerificationStatus.PENDING:
+            raise serializers.ValidationError({"email": "Заявка еще не подтверждена администратором"})
         if not user.check_password(password):
             raise serializers.ValidationError({"password": "Неверный пароль"})
         if user.is_blocked:

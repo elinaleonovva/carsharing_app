@@ -135,6 +135,30 @@ const initialBonusZoneForm: BonusZoneForm = {
   is_active: true,
 };
 
+function getStoredToken(): string | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  return window.sessionStorage.getItem(TOKEN_KEY);
+}
+
+function storeToken(token: string): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.sessionStorage.setItem(TOKEN_KEY, token);
+}
+
+function clearStoredToken(): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.sessionStorage.removeItem(TOKEN_KEY);
+}
+
 function normalizeMessage(message: string): string {
   return message.trim().replace(/[.!?]+$/u, "");
 }
@@ -232,7 +256,6 @@ function validateAuthForm(mode: AuthMode, form: AuthForm): string | null {
     return "Серия ВУ должна содержать 4 цифры или 2 цифры и 2 буквы";
   }
   if (!form.password.trim()) return "Введите пароль";
-  if (form.password.length < 8) return "Пароль должен содержать минимум 8 символов";
   if (!form.password_confirm.trim()) return "Повторите пароль";
   if (form.password !== form.password_confirm) return "Пароли не совпадают";
 
@@ -394,7 +417,7 @@ function buildFullName(user: User): string {
 
 function App() {
   const [mode, setMode] = useState<AuthMode>("login");
-  const [token, setToken] = useState(() => localStorage.getItem(TOKEN_KEY));
+  const [token, setToken] = useState<string | null>(() => getStoredToken());
   const [user, setUser] = useState<User | null>(null);
   const [authForm, setAuthForm] = useState<AuthForm>(initialAuthForm);
   const [message, setMessage] = useState("");
@@ -408,7 +431,7 @@ function App() {
       .me(token)
       .then(setUser)
       .catch(() => {
-        localStorage.removeItem(TOKEN_KEY);
+        clearStoredToken();
         setToken(null);
       })
       .finally(() => setIsLoading(false));
@@ -431,28 +454,36 @@ function App() {
     setIsLoading(true);
 
     try {
-      const response =
-        mode === "login"
-          ? await api.login({
-              email: authForm.email.trim().toLowerCase(),
-              password: authForm.password,
-            })
-          : await api.register({
-              email: authForm.email.trim().toLowerCase(),
-              password: authForm.password,
-              password_confirm: authForm.password_confirm,
-              first_name: authForm.first_name.trim().replace(/\s+/g, " "),
-              last_name: authForm.last_name.trim().replace(/\s+/g, " "),
-              patronymic: authForm.patronymic.trim().replace(/\s+/g, " "),
-              phone: normalizePhoneInput(authForm.phone),
-              driver_license_number: normalizeDriverLicenseInput(authForm.driver_license_number),
-            });
+      if (mode === "login") {
+        const response = await api.login({
+          email: authForm.email.trim().toLowerCase(),
+          password: authForm.password,
+        });
 
-      localStorage.setItem(TOKEN_KEY, response.token);
-      setToken(response.token);
-      setUser(response.user);
-      setAuthForm(initialAuthForm);
-      setMessage(mode === "login" ? "Вход выполнен" : "Заявка отправлена");
+        storeToken(response.token);
+        setToken(response.token);
+        setUser(response.user);
+        setAuthForm(initialAuthForm);
+        setMessage("Вход выполнен");
+      } else {
+        const response = await api.register({
+          email: authForm.email.trim().toLowerCase(),
+          password: authForm.password,
+          password_confirm: authForm.password_confirm,
+          first_name: authForm.first_name.trim().replace(/\s+/g, " "),
+          last_name: authForm.last_name.trim().replace(/\s+/g, " "),
+          patronymic: authForm.patronymic.trim().replace(/\s+/g, " "),
+          phone: normalizePhoneInput(authForm.phone),
+          driver_license_number: normalizeDriverLicenseInput(authForm.driver_license_number),
+        });
+
+        setMode("login");
+        setAuthForm({
+          ...initialAuthForm,
+          email: authForm.email.trim().toLowerCase(),
+        });
+        setMessage(response.detail);
+      }
     } catch (error) {
       setMessage(getErrorMessage(error));
     } finally {
@@ -465,7 +496,7 @@ function App() {
       await api.logout(token).catch(() => undefined);
     }
 
-    localStorage.removeItem(TOKEN_KEY);
+    clearStoredToken();
     setToken(null);
     setUser(null);
     setMessage("");
@@ -485,7 +516,7 @@ function App() {
 
 
   return (
-    <main className="app-shell">
+    <main className="app-shell auth-shell">
       <section className="intro-panel">
         <div className="brand-row">
           <span className="brand-mark">CP</span>
@@ -500,7 +531,7 @@ function App() {
       </section>
 
       <section className="work-panel">
-        <div className="auth-card">
+        <div className={mode === "register" ? "auth-card auth-card--compact" : "auth-card"}>
           <div className="mode-switch" role="tablist" aria-label="Выбор формы">
             <button
               className={mode === "login" ? "active" : ""}

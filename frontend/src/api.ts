@@ -109,6 +109,11 @@ export type AuthResponse = {
   user: User;
 };
 
+export type RegisterResponse = {
+  detail: string;
+  user: User;
+};
+
 const API_BASE_URL = appConfig.apiBaseUrl;
 
 type RequestOptions = {
@@ -155,7 +160,7 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
 
 export const api = {
   register: (body: unknown) =>
-    request<AuthResponse>("/auth/register/", {
+    request<RegisterResponse>("/auth/register/", {
       method: "POST",
       body,
     }),
