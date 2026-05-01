@@ -83,3 +83,57 @@ docker compose up --build
 5. После запуска приложение будет доступно по адресу:
 
 [http://localhost:8080](http://localhost:8080)
+
+## CI/CD деплой на сервер
+
+При пуше в ветку `master` GitHub Actions:
+
+- собирает Docker-образы `elinaleonova/carsharing-backend`, `elinaleonova/carsharing-frontend` и `elinaleonova/carsharing-nginx`;
+- отправляет их в Docker Hub;
+- загружает на сервер только файл `docker-compose.yml`;
+- выполняет на сервере `docker compose pull` и `docker compose up -d`.
+
+### Что добавлено в репозиторий
+
+- workflow: `.github/workflows/deploy.yml`;
+- production compose: `docker-compose.server.yml`;
+- Dockerfile для production nginx: `infra/nginx/Dockerfile`.
+
+### GitHub Secrets
+
+В настройках репозитория нужно создать:
+
+- `DOCKERHUB_USERNAME` — логин Docker Hub;
+- `DOCKERHUB_TOKEN` — access token Docker Hub;
+- `SERVER_HOST` — IP или домен сервера;
+- `SERVER_PORT` — SSH-порт сервера, обычно `22`;
+- `SERVER_USER` — пользователь для SSH;
+- `SERVER_SSH_KEY` — приватный SSH-ключ для входа на сервер;
+- `SERVER_DEPLOY_PATH` — директория на сервере, где будет лежать `docker-compose.yml`, например `/opt/carsharing`;
+- `POSTGRES_DB` — имя базы данных;
+- `POSTGRES_USER` — пользователь PostgreSQL;
+- `POSTGRES_PASSWORD` — пароль PostgreSQL;
+- `DJANGO_SECRET_KEY` — секретный ключ Django;
+- `DJANGO_ALLOWED_HOSTS` — список хостов через запятую, например `example.com,www.example.com,SERVER_IP`;
+- `DJANGO_CSRF_TRUSTED_ORIGINS` — список origin через запятую, например `https://example.com,http://SERVER_IP`;
+- `FRONTEND_URL` — публичный адрес frontend, например `https://example.com/`;
+- `APP_YANDEX_MAPS_API_KEY` — ключ Yandex Maps API;
+- `APP_YANDEX_MAPS_LANG` — язык карт, например `ru_RU`;
+- `NGINX_PORT` — порт, который будет открыт на сервере, например `80`.
+
+### Что должно быть на сервере
+
+На сервере должны быть установлены:
+
+- Docker;
+- Docker Compose plugin (`docker compose`);
+- открытый порт приложения, который указан в `NGINX_PORT`.
+
+Для первого запуска достаточно создать директорию деплоя, например:
+
+```bash
+sudo mkdir -p /opt/carsharing
+sudo chown $USER:$USER /opt/carsharing
+```
+
+После этого каждый `push` в `master` будет автоматически обновлять приложение на сервере.

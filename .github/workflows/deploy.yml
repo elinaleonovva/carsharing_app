@@ -1,0 +1,131 @@
+name: Build And Deploy
+
+on:
+  push:
+    branches:
+      - master
+
+env:
+  DOCKERHUB_NAMESPACE: elinaleonova
+  DEPLOY_COMPOSE_PATH: docker-compose.server.yml
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Install envsubst
+        run: sudo apt-get update && sudo apt-get install -y gettext-base
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Extract Docker metadata for backend
+        id: backend-meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.DOCKERHUB_NAMESPACE }}/carsharing-backend
+          tags: |
+            type=raw,value=latest
+            type=sha
+
+      - name: Build and push backend image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: backend/Dockerfile
+          push: true
+          tags: ${{ steps.backend-meta.outputs.tags }}
+          labels: ${{ steps.backend-meta.outputs.labels }}
+
+      - name: Extract Docker metadata for frontend
+        id: frontend-meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.DOCKERHUB_NAMESPACE }}/carsharing-frontend
+          tags: |
+            type=raw,value=latest
+            type=sha
+
+      - name: Build and push frontend image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: frontend/Dockerfile
+          push: true
+          tags: ${{ steps.frontend-meta.outputs.tags }}
+          labels: ${{ steps.frontend-meta.outputs.labels }}
+
+      - name: Extract Docker metadata for nginx
+        id: nginx-meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.DOCKERHUB_NAMESPACE }}/carsharing-nginx
+          tags: |
+            type=raw,value=latest
+            type=sha
+
+      - name: Build and push nginx image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: infra/nginx/Dockerfile
+          push: true
+          tags: ${{ steps.nginx-meta.outputs.tags }}
+          labels: ${{ steps.nginx-meta.outputs.labels }}
+
+      - name: Render deployment compose file
+        shell: bash
+        env:
+          POSTGRES_DB: ${{ secrets.POSTGRES_DB }}
+          POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          DJANGO_SECRET_KEY: ${{ secrets.DJANGO_SECRET_KEY }}
+          DJANGO_ALLOWED_HOSTS: ${{ secrets.DJANGO_ALLOWED_HOSTS }}
+          DJANGO_CSRF_TRUSTED_ORIGINS: ${{ secrets.DJANGO_CSRF_TRUSTED_ORIGINS }}
+          FRONTEND_URL: ${{ secrets.FRONTEND_URL }}
+          APP_YANDEX_MAPS_API_KEY: ${{ secrets.APP_YANDEX_MAPS_API_KEY }}
+          APP_YANDEX_MAPS_LANG: ${{ secrets.APP_YANDEX_MAPS_LANG }}
+          NGINX_PORT: ${{ secrets.NGINX_PORT }}
+        run: |
+          envsubst < "${DEPLOY_COMPOSE_PATH}" > docker-compose.deploy.yml
+
+      - name: Copy compose file to server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          port: ${{ secrets.SERVER_PORT }}
+          source: docker-compose.deploy.yml
+          target: ${{ secrets.SERVER_DEPLOY_PATH }}
+          overwrite: true
+          strip_components: 0
+
+      - name: Deploy on server
+        uses: appleboy/ssh-action@v1.2.0
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+          SERVER_DEPLOY_PATH: ${{ secrets.SERVER_DEPLOY_PATH }}
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          port: ${{ secrets.SERVER_PORT }}
+          envs: DOCKERHUB_USERNAME,DOCKERHUB_TOKEN,SERVER_DEPLOY_PATH
+          script: |
+            cd "$SERVER_DEPLOY_PATH"
+            mv docker-compose.deploy.yml docker-compose.yml
+            echo "$DOCKERHUB_TOKEN" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
+            docker compose pull
+            docker compose up -d
