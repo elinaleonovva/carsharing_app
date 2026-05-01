@@ -19,6 +19,8 @@ services:
     image: elinaleonova/carsharing-backend:latest
     container_name: carsharing_backend
     restart: unless-stopped
+    volumes:
+      - static_data:/app/static
     environment:
       DB_ENGINE: django.db.backends.postgresql
       DB_NAME: ${POSTGRES_DB}
@@ -53,6 +55,8 @@ services:
     restart: unless-stopped
     ports:
       - "${NGINX_PORT}:80"
+    volumes:
+      - static_data:/static:ro
     depends_on:
       backend:
         condition: service_started
@@ -61,3 +65,4 @@ services:
 
 volumes:
   postgres_data:
+  static_data:

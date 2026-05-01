@@ -23,6 +23,8 @@ services:
       dockerfile: backend/Dockerfile
     container_name: carsharing_backend
     restart: unless-stopped
+    volumes:
+      - static_data:/app/static
     ports:
       - "${BACKEND_PORT:-8000}:8000"
     environment:
@@ -64,6 +66,7 @@ services:
       - "${NGINX_PORT:-8080}:80"
     volumes:
       - ./infra/nginx/nginx.test.conf:/etc/nginx/nginx.conf:ro
+      - static_data:/static:ro
     depends_on:
       postgres:
         condition: service_healthy
@@ -74,3 +77,4 @@ services:
 
 volumes:
   postgres_data:
+  static_data:
