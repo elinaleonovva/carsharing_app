@@ -3,7 +3,7 @@ from decimal import Decimal
 from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand
 
-from apps.rentals.models import BonusZone, Car, Tariff, TimeCoefficient
+from apps.rentals.models import Car, Tariff, TimeCoefficient
 
 
 MOSCOW_CARS = [
@@ -37,44 +37,45 @@ MOSCOW_CARS = [
     ("Haval", "Dargo", "M724BP797", "55.819741", "37.630981", "16.00"),
     ("Geely", "Monjaro", "O351EM797", "55.735900", "37.520500", "19.00"),
     ("Chery", "Tiggo 8 Pro", "H982CK797", "55.707746", "37.540091", "17.00"),
+    ("Kia", "Rio", "A541TK797", "55.752880", "37.569441", "10.00"),
+    ("Kia", "Sportage", "E274HA797", "55.742116", "37.671248", "14.00"),
+    ("Kia", "K5", "M908BP797", "55.781403", "37.655871", "15.00"),
+    ("Nissan", "Qashqai", "K617MP797", "55.769845", "37.552610", "13.00"),
+    ("Nissan", "X-Trail", "O452PE797", "55.726950", "37.684812", "15.00"),
+    ("Nissan", "Sentra", "T381OK797", "55.707102", "37.600447", "11.00"),
+    ("Hyundai", "Solaris", "B153HE797", "55.797854", "37.612935", "10.00"),
+    ("Hyundai", "Creta", "C824PA797", "55.785220", "37.714532", "13.00"),
+    ("Hyundai", "Elantra", "Y962CK797", "55.718940", "37.556128", "12.00"),
+    ("Mazda", "3", "P406MY797", "55.744603", "37.699125", "12.00"),
+    ("Mazda", "6", "H518AO797", "55.771218", "37.521904", "14.00"),
+    ("Mazda", "CX-5", "X349PT797", "55.693145", "37.618774", "15.00"),
+    ("Toyota", "Corolla", "A286MA797", "55.807654", "37.658130", "12.00"),
+    ("Toyota", "Camry", "E670TP797", "55.733508", "37.569982", "16.00"),
+    ("Toyota", "RAV4", "K214BX797", "55.758211", "37.706344", "15.00"),
+    ("BMW", "320i", "M735TA797", "55.784664", "37.585714", "18.00"),
+    ("BMW", "X1", "O168HC797", "55.716232", "37.671953", "19.00"),
+    ("Mercedes", "C 180", "T593CM797", "55.762944", "37.731208", "18.00"),
+    ("Mercedes", "GLA 200", "Y840AM797", "55.726408", "37.531902", "20.00"),
+    ("Ford", "Focus", "B497PE797", "55.699286", "37.582447", "11.00"),
+    ("Ford", "Kuga", "C156TT797", "55.808992", "37.547826", "14.00"),
+    ("Volvo", "XC40", "H268XO797", "55.789105", "37.674920", "18.00"),
+    ("Volvo", "S60", "X470PB797", "55.712744", "37.702681", "17.00"),
+    ("Audi", "A3", "A691EK797", "55.738350", "37.719441", "14.00"),
+    ("Audi", "A4", "E902YX797", "55.776993", "37.565228", "17.00"),
+    ("Audi", "Q3", "K845HB797", "55.689514", "37.561780", "18.00"),
+    ("Skoda", "Octavia", "M314KT797", "55.804431", "37.620905", "12.00"),
+    ("Skoda", "Karoq", "O557AH797", "55.729364", "37.710028", "14.00"),
+    ("Renault", "Duster", "T628BC797", "55.681602", "37.640912", "12.00"),
+    ("Renault", "Arkana", "Y749PC797", "55.754916", "37.503118", "13.00"),
 ]
 
 LEGACY_DEMO_PLATES = ["A111AA", "B222BB", "C333CC"]
 
-BONUS_ZONES = [
-    ("Скидочная зона у Парка Горького", "55.729800", "37.603700", 650, Decimal("10.00")),
-    ("Скидочная зона у Сокольников", "55.794000", "37.676200", 700, Decimal("10.00")),
-    ("Скидочная зона у Москва-Сити", "55.749500", "37.539600", 600, Decimal("10.00")),
-]
-
 
 class Command(BaseCommand):
-    help = "Create demo admin, tariff, coefficients and cars"
+    help = "Create demo tariff, coefficients and cars"
 
     def handle(self, *args, **options):
-        User = get_user_model()
-
-        admin = User.objects.filter(email="admin@example.com").first()
-        if admin is None:
-            admin = User.objects.filter(username="admin").first()
-
-        if admin is None:
-            admin = User(username="admin", email="admin@example.com")
-
-        if not User.objects.filter(email="admin@example.com").exclude(pk=admin.pk).exists():
-            admin.email = "admin@example.com"
-        admin.first_name = "Админ"
-        admin.last_name = "Системный"
-        admin.patronymic = "Петрович"
-        admin.phone = "79990000000"
-        admin.driver_license_number = "99 99 999999"
-        admin.role = User.Role.ADMIN
-        admin.verification_status = User.VerificationStatus.APPROVED
-        admin.is_staff = True
-        admin.is_superuser = True
-        admin.set_password("Admin12345")
-        admin.save()
-
         Tariff.objects.update_or_create(
             pk=1,
             defaults={
@@ -118,18 +119,6 @@ class Command(BaseCommand):
                     "latitude": latitude,
                     "longitude": longitude,
                     "price_per_minute": Decimal(price_per_minute),
-                },
-            )
-
-        for name, latitude, longitude, radius_meters, discount_percent in BONUS_ZONES:
-            BonusZone.objects.update_or_create(
-                name=name,
-                defaults={
-                    "latitude": latitude,
-                    "longitude": longitude,
-                    "radius_meters": radius_meters,
-                    "discount_percent": discount_percent,
-                    "is_active": True,
                 },
             )
 
