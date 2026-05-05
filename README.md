@@ -52,6 +52,37 @@
 - Nginx — веб-сервер и reverse proxy для frontend и backend на одном адресе.
 - Yandex Maps JavaScript API — API для отображения карты, машин, маршрутов и пользовательских точек.
 
+## Структура проекта
+
+Исходный код клиент-серверного приложения размещён в системе контроля версий Git. Репозиторий содержит frontend, backend, конфигурацию контейнеризации и файлы для развёртывания приложения.
+
+```text
+carsharing_app/
+├── backend/                  # Серверная часть приложения на Django и Django REST Framework
+│   ├── apps/                 # Django-приложения: аккаунты, аренда, тарифы
+│   ├── config/               # Основные настройки Django, маршруты, WSGI/ASGI
+│   ├── manage.py             # Утилита управления Django-проектом
+│   ├── requirements.txt      # Python-зависимости backend
+│   └── Dockerfile            # Dockerfile для сборки backend-контейнера
+├── frontend/                 # Клиентская часть приложения на React и TypeScript
+│   ├── src/                  # Исходный код SPA-приложения
+│   ├── package.json          # npm-скрипты и зависимости frontend
+│   ├── webpack.config.cjs    # Конфигурация сборки frontend
+│   └── Dockerfile            # Dockerfile для сборки frontend-контейнера
+├── infra/
+│   └── nginx/                # Конфигурация Nginx
+│       ├── nginx.conf        # Конфигурация для локальной разработки
+│       ├── nginx.test.conf   # Конфигурация для контейнерного запуска
+│       └── Dockerfile        # Dockerfile для production-образа Nginx
+├── docker-compose.yml        # Основной compose-файл для запуска приложения в Docker
+├── docker-compose.dev.yml    # Compose-файл для локальной разработки
+├── docker-compose.server.yml # Compose-файл для развёртывания на сервере
+├── .env.example              # Пример переменных окружения
+└── README.md                 # Описание проекта и инструкция по запуску
+```
+
+Контейнеризация приложения описана в `docker-compose.yml`. Для сборки отдельных частей системы используются Dockerfile в директориях `backend/`, `frontend/` и `infra/nginx/`.
+
 ## Запуск проекта
 
 1. Клонируйте репозиторий:
@@ -93,47 +124,5 @@ docker compose up --build
 - загружает на сервер только файл `docker-compose.yml`;
 - выполняет на сервере `docker compose pull` и `docker compose up -d`.
 
-### Что добавлено в репозиторий
-
-- workflow: `.github/workflows/deploy.yml`;
-- production compose: `docker-compose.server.yml`;
-- Dockerfile для production nginx: `infra/nginx/Dockerfile`.
-
-### GitHub Secrets
-
-В настройках репозитория нужно создать:
-
-- `DOCKERHUB_USERNAME` — логин Docker Hub;
-- `DOCKERHUB_TOKEN` — access token Docker Hub;
-- `SERVER_HOST` — IP или домен сервера;
-- `SERVER_PORT` — SSH-порт сервера, обычно `22`;
-- `SERVER_USER` — пользователь для SSH;
-- `SERVER_SSH_KEY` — приватный SSH-ключ для входа на сервер;
-- `SERVER_DEPLOY_PATH` — директория на сервере, где будет лежать `docker-compose.yml`, например `/opt/carsharing`;
-- `POSTGRES_DB` — имя базы данных;
-- `POSTGRES_USER` — пользователь PostgreSQL;
-- `POSTGRES_PASSWORD` — пароль PostgreSQL;
-- `DJANGO_SECRET_KEY` — секретный ключ Django;
-- `DJANGO_ALLOWED_HOSTS` — список хостов через запятую, например `example.com,www.example.com,SERVER_IP`;
-- `DJANGO_CSRF_TRUSTED_ORIGINS` — список origin через запятую, например `https://example.com,http://SERVER_IP`;
-- `FRONTEND_URL` — публичный адрес frontend, например `https://example.com/`;
-- `APP_YANDEX_MAPS_API_KEY` — ключ Yandex Maps API;
-- `APP_YANDEX_MAPS_LANG` — язык карт, например `ru_RU`;
-- `NGINX_PORT` — порт, который будет открыт на сервере, например `80`.
-
-### Что должно быть на сервере
-
-На сервере должны быть установлены:
-
-- Docker;
-- Docker Compose plugin (`docker compose`);
-- открытый порт приложения, который указан в `NGINX_PORT`.
-
-Для первого запуска достаточно создать директорию деплоя, например:
-
-```bash
-sudo mkdir -p /opt/carsharing
-sudo chown $USER:$USER /opt/carsharing
-```
-
-После этого каждый `push` в `master` будет автоматически обновлять приложение на сервере.
+### Приложение доступно по адрсесу: 
+http://192.144.12.152:81
