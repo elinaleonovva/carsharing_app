@@ -725,7 +725,11 @@ export function AdminDashboard({ token, user, onLogout }: { token: string; user:
                 Пополнить
               </button>
             </div>
-            {walletMessage && <p className="message section-message wallet-message">{walletMessage}</p>}
+            {walletMessage && (
+              <p className={`message section-message wallet-message ${walletMessage.includes("успешно") ? "" : "error-message"}`}>
+                {walletMessage}
+              </p>
+            )}
           </div>
 
           <div className="panel wide-panel">

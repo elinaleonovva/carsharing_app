@@ -48,7 +48,11 @@ export function UserWalletSection({
             Пополнить
           </button>
         </div>
-        {message && <p className="message section-message wallet-message">{message}</p>}
+        {message && (
+          <p className={`message section-message wallet-message ${message.includes("успешно") ? "" : "error-message"}`}>
+            {message}
+          </p>
+        )}
       </div>
 
       <div className="panel wide-panel">
