@@ -17,6 +17,7 @@ import {
 import type { AdminTab, BonusZoneForm, BonusZonePreview, CarForm, Coordinates, RouteSummary } from "../types";
 import type { Booking, BonusZone, Car, Tariff, TimeCoefficient, Trip, User, Wallet } from "../utils/api";
 import { api } from "../utils/api";
+import { clearCustomValidity, russianValidation } from "../utils/formValidation";
 import { formatCountdown, formatDateTime, formatMoney } from "../utils/format";
 import { calculateDistanceKm, getCarCoords, isInsideMkad, toApiCoordinate } from "../utils/map";
 import { getErrorMessage } from "../utils/messages";
@@ -705,7 +706,11 @@ export function AdminDashboard({ token, user, onLogout }: { token: string; user:
             <div className="inline-form wallet-top-up-form">
               <input
                 value={topUpAmount}
-                onChange={(event) => setTopUpAmount(event.target.value)}
+                onChange={(event) => {
+                  clearCustomValidity(event.currentTarget);
+                  setTopUpAmount(event.target.value);
+                }}
+                onInvalid={russianValidation({ label: "Сумма пополнения", min: 1 })}
                 type="number"
                 min="1"
                 step="1"
@@ -861,22 +866,43 @@ export function AdminDashboard({ token, user, onLogout }: { token: string; user:
             <form className="form-stack" onSubmit={handleSaveCar}>
               <label>
                 Марка
-                <input value={carForm.brand} onChange={(event) => setCarForm((form) => ({ ...form, brand: event.target.value }))} required />
+                <input
+                  value={carForm.brand}
+                  onChange={(event) => {
+                    clearCustomValidity(event.currentTarget);
+                    setCarForm((form) => ({ ...form, brand: event.target.value }));
+                  }}
+                  onInvalid={russianValidation({ label: "Марка" })}
+                  required
+                />
               </label>
               <label>
                 Модель
-                <input value={carForm.model} onChange={(event) => setCarForm((form) => ({ ...form, model: event.target.value }))} required />
+                <input
+                  value={carForm.model}
+                  onChange={(event) => {
+                    clearCustomValidity(event.currentTarget);
+                    setCarForm((form) => ({ ...form, model: event.target.value }));
+                  }}
+                  onInvalid={russianValidation({ label: "Модель" })}
+                  required
+                />
               </label>
               <label>
                 Госномер
                 <input
                   value={carForm.license_plate}
-                  onChange={(event) =>
+                  onChange={(event) => {
+                    clearCustomValidity(event.currentTarget);
                     setCarForm((form) => ({
                       ...form,
                       license_plate: event.target.value.replace(/[\s-]+/g, "").toUpperCase(),
-                    }))
-                  }
+                    }));
+                  }}
+                  onInvalid={russianValidation({
+                    label: "Госномер",
+                    patternMessage: "Введите госномер в формате А123ВС77 или А123ВС777",
+                  })}
                   maxLength={9}
                   pattern={licensePlatePattern}
                   title="Введите госномер в формате А123ВС77 или А123ВС777"
@@ -888,7 +914,11 @@ export function AdminDashboard({ token, user, onLogout }: { token: string; user:
                   Широта
                   <input
                     value={carForm.latitude}
-                    onChange={(event) => setCarForm((form) => ({ ...form, latitude: event.target.value }))}
+                    onChange={(event) => {
+                      clearCustomValidity(event.currentTarget);
+                      setCarForm((form) => ({ ...form, latitude: event.target.value }));
+                    }}
+                    onInvalid={russianValidation({ label: "Широта", min: "55.55", max: "55.92" })}
                     onKeyDown={(event) => {
                       if (blockedNumberKeys.includes(event.key)) event.preventDefault();
                     }}
@@ -904,7 +934,11 @@ export function AdminDashboard({ token, user, onLogout }: { token: string; user:
                   Долгота
                   <input
                     value={carForm.longitude}
-                    onChange={(event) => setCarForm((form) => ({ ...form, longitude: event.target.value }))}
+                    onChange={(event) => {
+                      clearCustomValidity(event.currentTarget);
+                      setCarForm((form) => ({ ...form, longitude: event.target.value }));
+                    }}
+                    onInvalid={russianValidation({ label: "Долгота", min: "37.35", max: "37.86" })}
                     onKeyDown={(event) => {
                       if (blockedNumberKeys.includes(event.key)) event.preventDefault();
                     }}
@@ -931,7 +965,11 @@ export function AdminDashboard({ token, user, onLogout }: { token: string; user:
                 Цена за минуту
                 <input
                   value={carForm.price_per_minute}
-                  onChange={(event) => setCarForm((form) => ({ ...form, price_per_minute: event.target.value }))}
+                  onChange={(event) => {
+                    clearCustomValidity(event.currentTarget);
+                    setCarForm((form) => ({ ...form, price_per_minute: event.target.value }));
+                  }}
+                  onInvalid={russianValidation({ label: "Цена за минуту", min: "0.01" })}
                   onKeyDown={(event) => {
                     if (blockedNumberKeys.includes(event.key) || event.key === "-") event.preventDefault();
                   }}
@@ -1048,7 +1086,11 @@ export function AdminDashboard({ token, user, onLogout }: { token: string; user:
                 Радиус, м
                 <input
                   value={zoneForm.radius_meters}
-                  onChange={(event) => setZoneForm((form) => ({ ...form, radius_meters: event.target.value }))}
+                  onChange={(event) => {
+                    clearCustomValidity(event.currentTarget);
+                    setZoneForm((form) => ({ ...form, radius_meters: event.target.value }));
+                  }}
+                  onInvalid={russianValidation({ label: "Радиус бонусной зоны", min: 50, max: 5000 })}
                   onKeyDown={(event) => {
                     if (blockedNumberKeys.includes(event.key) || event.key === "-" || event.key === ".") event.preventDefault();
                   }}
@@ -1090,7 +1132,11 @@ export function AdminDashboard({ token, user, onLogout }: { token: string; user:
                       <input
                         aria-label="Название"
                         value={coefficient.name}
-                        onChange={(event) => updateCoefficientField(coefficient.id, "name", event.target.value)}
+                        onChange={(event) => {
+                          clearCustomValidity(event.currentTarget);
+                          updateCoefficientField(coefficient.id, "name", event.target.value);
+                        }}
+                        onInvalid={russianValidation({ label: "Название коэффициента" })}
                         required
                       />
                     </div>
@@ -1099,7 +1145,11 @@ export function AdminDashboard({ token, user, onLogout }: { token: string; user:
                         aria-label="Начало"
                         type="time"
                         value={coefficient.start_time.slice(0, 5)}
-                        onChange={(event) => updateCoefficientField(coefficient.id, "start_time", event.target.value)}
+                        onChange={(event) => {
+                          clearCustomValidity(event.currentTarget);
+                          updateCoefficientField(coefficient.id, "start_time", event.target.value);
+                        }}
+                        onInvalid={russianValidation({ label: "Время начала", min: "00:00", max: "23:59" })}
                         min="00:00"
                         max="23:59"
                         step="60"
@@ -1111,7 +1161,11 @@ export function AdminDashboard({ token, user, onLogout }: { token: string; user:
                         aria-label="Конец"
                         type="time"
                         value={coefficient.end_time.slice(0, 5)}
-                        onChange={(event) => updateCoefficientField(coefficient.id, "end_time", event.target.value)}
+                        onChange={(event) => {
+                          clearCustomValidity(event.currentTarget);
+                          updateCoefficientField(coefficient.id, "end_time", event.target.value);
+                        }}
+                        onInvalid={russianValidation({ label: "Время окончания", min: "00:00", max: "23:59" })}
                         min="00:00"
                         max="23:59"
                         step="60"
@@ -1124,7 +1178,11 @@ export function AdminDashboard({ token, user, onLogout }: { token: string; user:
                         type="number"
                         inputMode="decimal"
                         value={coefficient.coefficient}
-                        onChange={(event) => updateCoefficientField(coefficient.id, "coefficient", event.target.value)}
+                        onChange={(event) => {
+                          clearCustomValidity(event.currentTarget);
+                          updateCoefficientField(coefficient.id, "coefficient", event.target.value);
+                        }}
+                        onInvalid={russianValidation({ label: "Коэффициент", min: "0.01", max: 9 })}
                         onKeyDown={(event) => {
                           if (blockedNumberKeys.includes(event.key) || event.key === "-") event.preventDefault();
                         }}

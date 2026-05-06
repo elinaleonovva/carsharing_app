@@ -1,4 +1,5 @@
 import type { Wallet } from "../utils/api";
+import { clearCustomValidity, russianValidation } from "../utils/formValidation";
 import { formatDateTime, formatMoney } from "../utils/format";
 
 type UserWalletSectionProps = {
@@ -34,7 +35,11 @@ export function UserWalletSection({
         <div className="inline-form wallet-top-up-form">
           <input
             value={topUpAmount}
-            onChange={(event) => onTopUpAmountChange(event.target.value)}
+            onChange={(event) => {
+              clearCustomValidity(event.currentTarget);
+              onTopUpAmountChange(event.target.value);
+            }}
+            onInvalid={russianValidation({ label: "Сумма пополнения", min: 1 })}
             type="number"
             min="1"
             step="1"
