@@ -46,6 +46,11 @@ class CarSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Введите госномер в формате А123ВС77 или А123ВС777")
         return license_plate
 
+    def validate_price_per_minute(self, value):
+        if value <= 0:
+            raise serializers.ValidationError("Цена за минуту должна быть больше нуля")
+        return value
+
     def validate(self, attrs):
         latitude = attrs.get("latitude", self.instance.latitude if self.instance else None)
         longitude = attrs.get("longitude", self.instance.longitude if self.instance else None)

@@ -67,6 +67,7 @@ class UserSerializer(serializers.ModelSerializer):
     can_use_service = serializers.BooleanField(read_only=True)
     email = serializers.EmailField(
         required=True,
+        max_length=254,
         error_messages={
             "blank": "Введите email",
             "invalid": "Введите корректный email",
@@ -143,6 +144,7 @@ class RegisterSerializer(serializers.ModelSerializer):
     email = serializers.EmailField(
         required=True,
         allow_blank=False,
+        max_length=254,
         error_messages={
             "blank": "Введите email",
             "invalid": "Введите корректный email",
@@ -290,6 +292,7 @@ class RegisterSerializer(serializers.ModelSerializer):
 
 class LoginSerializer(serializers.Serializer):
     email = serializers.EmailField(
+        max_length=254,
         error_messages={
             "blank": "Введите email",
             "invalid": "Введите корректный email",
