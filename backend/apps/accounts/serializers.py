@@ -8,6 +8,9 @@ from .models import User
 PHONE_ALLOWED_RE = re.compile(r"^\d+$")
 DRIVER_LICENSE_SERIES_RE = re.compile(r"^[0-9A-Za-zА-Яа-яЁё]{4}$")
 PERSON_NAME_RE = re.compile(r"^[A-Za-zА-Яа-яЁё]+(?:[ -][A-Za-zА-Яа-яЁё]+)*$")
+DRIVER_LICENSE_FORMAT_MESSAGE = (
+    "Введите номер ВУ в формате 1234 123456 или 12АБ 123456"
+)
 
 
 def contains_null_byte(value: str) -> bool:
@@ -49,13 +52,13 @@ def normalize_driver_license(value: str) -> str:
     compact = re.sub(r"\s+", "", value.strip()).upper()
 
     if len(compact) != 10:
-        raise serializers.ValidationError("Введите номер водительского удостоверения в формате XX XX YYYYYY")
+        raise serializers.ValidationError(DRIVER_LICENSE_FORMAT_MESSAGE)
 
     series = compact[:4]
     number = compact[4:]
 
     if not DRIVER_LICENSE_SERIES_RE.fullmatch(series) or not number.isdigit():
-        raise serializers.ValidationError("Введите номер водительского удостоверения в формате XX XX YYYYYY")
+        raise serializers.ValidationError(DRIVER_LICENSE_FORMAT_MESSAGE)
 
     is_digit_series = bool(re.fullmatch(r"\d{4}", series))
     is_mixed_series = bool(re.fullmatch(r"\d{2}[A-Za-zА-Яа-яЁё]{2}", series))

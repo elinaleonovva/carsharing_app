@@ -4,6 +4,8 @@ const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const personNamePattern = /^[A-Za-zА-Яа-яЁё]+(?:[ -][A-Za-zА-Яа-яЁё]+)*$/;
 const phonePattern = /^\d+$/;
 const driverLicenseSeriesPattern = /^[0-9A-Za-zА-Яа-яЁё]{4}$/;
+const driverLicenseFormatMessage =
+  "Введите номер ВУ в формате 1234 123456 или 12АБ 123456";
 
 export function normalizePersonNameInput(value: string): string {
   return value.replace(/[^A-Za-zА-Яа-яЁё -]+/g, "").replace(/\s{2,}/g, " ");
@@ -53,7 +55,7 @@ export function validateAuthForm(mode: AuthMode, form: AuthForm): string | null 
   if (!phonePattern.test(form.phone.trim())) return "Телефон должен содержать только цифры";
   if (form.phone.trim().length !== 11) return "Телефон должен содержать 11 цифр";
   if (!license) return "Введите номер водительского удостоверения";
-  if (license.length !== 10) return "Введите номер ВУ в формате XX XX YYYYYY";
+  if (license.length !== 10) return driverLicenseFormatMessage;
 
   const series = license.slice(0, 4);
   const number = license.slice(4);
@@ -61,7 +63,7 @@ export function validateAuthForm(mode: AuthMode, form: AuthForm): string | null 
   const isMixedSeries = /^\d{2}[A-Za-zА-Яа-яЁё]{2}$/.test(series);
 
   if (!driverLicenseSeriesPattern.test(series) || !/^\d{6}$/.test(number)) {
-    return "Введите номер ВУ в формате XX XX YYYYYY";
+    return driverLicenseFormatMessage;
   }
   if (!(isDigitSeries || isMixedSeries)) {
     return "Серия ВУ должна содержать 4 цифры или 2 цифры и 2 буквы";
