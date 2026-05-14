@@ -1,4 +1,3 @@
-import { WaitingScreen } from "./components/WaitingScreen";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { AdminDashboard } from "./pages/AdminDashboard";
 import { AuthPage } from "./pages/AuthPage";
@@ -12,11 +11,7 @@ function AppContent() {
       return <AdminDashboard token={token} user={user} onLogout={logout} />;
     }
 
-    if (user.can_use_service) {
-      return <UserDashboard token={token} user={user} onLogout={logout} />;
-    }
-
-    return <WaitingScreen user={user} onLogout={logout} />;
+    return <UserDashboard token={token} user={user} onLogout={logout} />;
   }
 
   return <AuthPage onLoginSuccess={setSession} />;

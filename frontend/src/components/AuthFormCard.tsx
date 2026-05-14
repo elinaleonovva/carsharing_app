@@ -1,4 +1,4 @@
-import { FormEvent } from "react";
+import type { FormEvent } from "react";
 
 import type { AuthForm, AuthMode } from "../types";
 import {
@@ -145,7 +145,7 @@ export function AuthFormCard({
         </div>
 
         <button className="primary-button" disabled={isLoading} type="submit">
-          {isLoading ? "Подождите..." : mode === "login" ? "Войти" : "Отправить заявку"}
+          {isLoading ? "Подождите..." : mode === "login" ? "Войти" : "Зарегистрироваться"}
         </button>
       </form>
     </div>

@@ -1,4 +1,5 @@
-import { Dispatch, SetStateAction, useEffect } from "react";
+import { useEffect } from "react";
+import type { Dispatch, SetStateAction } from "react";
 
 export function useAutoDismissMessage(
   message: string,

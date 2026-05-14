@@ -27,7 +27,6 @@ import { getStatusTone } from "../utils/users";
 export function AdminDashboard({ token, user, onLogout }: { token: string; user: User; onLogout: () => void }) {
   const [tab, setTab] = useState<AdminTab>("map");
   const [adminUsers, setAdminUsers] = useState<User[]>([]);
-  const [applications, setApplications] = useState<User[]>([]);
   const [cars, setCars] = useState<Car[]>([]);
   const [wallet, setWallet] = useState<Wallet | null>(null);
   const [adminBooking, setAdminBooking] = useState<Booking | null>(null);
@@ -59,7 +58,6 @@ export function AdminDashboard({ token, user, onLogout }: { token: string; user:
   const [message, setMessage] = useState("");
 
   const selectedCar = cars.find((car) => car.id === selectedCarId) ?? null;
-  const pendingUsers = applications;
   const activeTrip = adminTrips.active;
   const history = adminTrips.history;
   const carPlacementLocation =
@@ -93,7 +91,6 @@ export function AdminDashboard({ token, user, onLogout }: { token: string; user:
     try {
       const [
         usersData,
-        applicationsData,
         carsData,
         walletData,
         bookingData,
@@ -105,7 +102,6 @@ export function AdminDashboard({ token, user, onLogout }: { token: string; user:
         bonusZonesData,
       ] = await Promise.all([
         api.adminUsers(token),
-        api.adminApplications(token),
         api.adminCars(token),
         api.wallet(token),
         api.booking(token),
@@ -118,7 +114,6 @@ export function AdminDashboard({ token, user, onLogout }: { token: string; user:
       ]);
 
       setAdminUsers(usersData);
-      setApplications(applicationsData);
       setCars(carsData);
       setWallet(walletData);
       setAdminBooking(bookingData);
@@ -845,20 +840,7 @@ export function AdminDashboard({ token, user, onLogout }: { token: string; user:
 
       {tab === "users" && (
         <AdminUsersSection
-          applications={pendingUsers}
           users={adminUsers}
-          onApprove={(item) =>
-            void runAction(
-              () => api.adminUserAction(token, item.id, "approve"),
-              "Заявка одобрена",
-            )
-          }
-          onReject={(item) =>
-            void runAction(
-              () => api.adminUserAction(token, item.id, "reject"),
-              "Заявка отклонена",
-            )
-          }
         />
       )}
 

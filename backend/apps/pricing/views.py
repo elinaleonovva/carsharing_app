@@ -15,7 +15,7 @@ class ServiceAccessMixin:
     def check_service_access(self, request):
         if not request.user.can_use_service:
             return Response(
-                {"detail": "Доступ к сервису еще не открыт администратором"},
+                {"detail": "Доступ к сервису ограничен"},
                 status=status.HTTP_403_FORBIDDEN,
             )
         return None

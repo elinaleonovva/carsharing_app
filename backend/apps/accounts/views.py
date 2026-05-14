@@ -24,7 +24,7 @@ class RegisterAPIView(APIView):
 
         return Response(
             {
-                "detail": "Заявка отправлена. Дождитесь подтверждения администратора, затем выполните вход",
+                "detail": "Регистрация завершена. Теперь можно войти в систему",
                 "user": UserSerializer(user).data,
             },
             status=status.HTTP_201_CREATED,

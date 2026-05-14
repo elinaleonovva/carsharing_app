@@ -291,7 +291,7 @@ class RegisterSerializer(serializers.ModelSerializer):
             for field, value in validated_data.items():
                 setattr(user, field, value)
 
-        user.verification_status = User.VerificationStatus.PENDING
+        user.verification_status = User.VerificationStatus.APPROVED
         user.is_blocked = False
         user.set_password(password)
         user.save()
@@ -325,12 +325,6 @@ class LoginSerializer(serializers.Serializer):
         user = User.objects.filter(email__iexact=email).first()
         if user is None:
             raise serializers.ValidationError({"email": "Пользователь с таким email не зарегистрирован"})
-        if user.verification_status == User.VerificationStatus.PENDING:
-            raise serializers.ValidationError({"email": "Заявка еще не подтверждена администратором"})
-        if user.verification_status == User.VerificationStatus.REJECTED:
-            raise serializers.ValidationError(
-                {"email": "Заявка отклонена. Проверьте введенные данные и отправьте новую заявку"}
-            )
         if not user.check_password(password):
             raise serializers.ValidationError({"password": "Неверный пароль"})
         if user.is_blocked:

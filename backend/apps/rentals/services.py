@@ -15,7 +15,7 @@ BOOKING_TTL_MINUTES = 15
 
 def ensure_user_can_use_service(user) -> None:
     if not user.can_use_service:
-        raise serializers.ValidationError("Доступ к сервису еще не открыт администратором")
+        raise serializers.ValidationError("Доступ к сервису ограничен")
 
 
 def ensure_user_has_no_debt(user) -> None:

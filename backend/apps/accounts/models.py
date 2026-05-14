@@ -44,7 +44,7 @@ class User(AbstractUser):
 
     @property
     def can_use_service(self) -> bool:
-        return self.is_active and not self.is_blocked and self.is_verified
+        return self.is_active and not self.is_blocked
 
     def generate_username(self) -> str:
         base_source = self.email.split("@", 1)[0] if self.email else "user"

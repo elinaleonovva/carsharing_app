@@ -8,7 +8,6 @@ export type AdminTab =
   | "wallet"
   | "activity"
   | "users"
-  | "applications"
   | "fleet"
   | "bookings"
   | "trips"
