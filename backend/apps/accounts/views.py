@@ -15,6 +15,7 @@ from .serializers import (
 
 class RegisterAPIView(APIView):
     permission_classes = [AllowAny]
+    serializer_class = RegisterSerializer
 
     def post(self, request):
         serializer = RegisterSerializer(data=request.data)
@@ -32,6 +33,7 @@ class RegisterAPIView(APIView):
 
 class LoginAPIView(APIView):
     permission_classes = [AllowAny]
+    serializer_class = LoginSerializer
 
     def post(self, request):
         serializer = LoginSerializer(data=request.data, context={"request": request})
@@ -49,6 +51,7 @@ class LoginAPIView(APIView):
 
 class LogoutAPIView(APIView):
     permission_classes = [IsNotBlocked]
+    serializer_class = UserSerializer
 
     def post(self, request):
         Token.objects.filter(user=request.user).delete()
@@ -57,6 +60,7 @@ class LogoutAPIView(APIView):
 
 class MeAPIView(APIView):
     permission_classes = [IsNotBlocked]
+    serializer_class = UserSerializer
 
     def get(self, request):
         return Response(UserSerializer(request.user).data)
@@ -70,6 +74,7 @@ class MeAPIView(APIView):
 
 class VerificationRequestAPIView(APIView):
     permission_classes = [IsNotBlocked]
+    serializer_class = VerificationRequestSerializer
 
     def post(self, request):
         serializer = VerificationRequestSerializer(data={}, context={"request": request})

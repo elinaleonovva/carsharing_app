@@ -42,6 +42,8 @@ class ServiceAccessMixin:
 
 
 class CarsAPIView(ServiceAccessMixin, APIView):
+    serializer_class = CarSerializer
+
     def get(self, request):
         access_error = self.check_service_access(request)
         if access_error:
@@ -53,6 +55,8 @@ class CarsAPIView(ServiceAccessMixin, APIView):
 
 
 class BookingsAPIView(ServiceAccessMixin, APIView):
+    serializer_class = BookingSerializer
+
     def get(self, request):
         access_error = self.check_service_access(request)
         if access_error:
@@ -74,6 +78,8 @@ class BookingsAPIView(ServiceAccessMixin, APIView):
 
 
 class BookingCancelAPIView(ServiceAccessMixin, APIView):
+    serializer_class = BookingSerializer
+
     def post(self, request, pk):
         access_error = self.check_service_access(request)
         if access_error:
@@ -85,6 +91,8 @@ class BookingCancelAPIView(ServiceAccessMixin, APIView):
 
 
 class TripsAPIView(ServiceAccessMixin, APIView):
+    serializer_class = TripSerializer
+
     def get(self, request):
         access_error = self.check_service_access(request)
         if access_error:
@@ -102,6 +110,8 @@ class TripsAPIView(ServiceAccessMixin, APIView):
 
 
 class TripStartAPIView(ServiceAccessMixin, APIView):
+    serializer_class = StartTripSerializer
+
     def post(self, request):
         access_error = self.check_service_access(request)
         if access_error:
@@ -119,6 +129,8 @@ class TripStartAPIView(ServiceAccessMixin, APIView):
 
 
 class TripFinishAPIView(ServiceAccessMixin, APIView):
+    serializer_class = FinishTripSerializer
+
     def post(self, request, pk):
         access_error = self.check_service_access(request)
         if access_error:
@@ -137,6 +149,8 @@ class TripFinishAPIView(ServiceAccessMixin, APIView):
 
 
 class TripDestinationAPIView(ServiceAccessMixin, APIView):
+    serializer_class = TripDestinationSerializer
+
     def post(self, request, pk):
         access_error = self.check_service_access(request)
         if access_error:
@@ -154,6 +168,8 @@ class TripDestinationAPIView(ServiceAccessMixin, APIView):
 
 
 class WalletAPIView(ServiceAccessMixin, APIView):
+    serializer_class = WalletTransactionSerializer
+
     def get(self, request):
         access_error = self.check_service_access(request)
         if access_error:
@@ -169,6 +185,8 @@ class WalletAPIView(ServiceAccessMixin, APIView):
 
 
 class WalletTopUpAPIView(ServiceAccessMixin, APIView):
+    serializer_class = TopUpSerializer
+
     def post(self, request):
         access_error = self.check_service_access(request)
         if access_error:
@@ -182,6 +200,7 @@ class WalletTopUpAPIView(ServiceAccessMixin, APIView):
 
 class AdminUsersAPIView(APIView):
     permission_classes = [IsAdminRole]
+    serializer_class = AdminUserSerializer
 
     def get(self, request):
         users = User.objects.filter(role=User.Role.USER).order_by("-date_joined")
@@ -190,6 +209,7 @@ class AdminUsersAPIView(APIView):
 
 class AdminApplicationsAPIView(APIView):
     permission_classes = [IsAdminRole]
+    serializer_class = AdminUserSerializer
 
     def get(self, request):
         users = User.objects.filter(
@@ -201,6 +221,7 @@ class AdminApplicationsAPIView(APIView):
 
 class AdminUserActionAPIView(APIView):
     permission_classes = [IsAdminRole]
+    serializer_class = AdminUserActionSerializer
 
     def post(self, request, pk):
         user = User.objects.get(pk=pk)
@@ -220,6 +241,7 @@ class AdminUserActionAPIView(APIView):
 
 class AdminCarsAPIView(APIView):
     permission_classes = [IsAdminRole]
+    serializer_class = CarSerializer
 
     def get(self, request):
         expire_stale_bookings()
@@ -234,6 +256,7 @@ class AdminCarsAPIView(APIView):
 
 class AdminCarDetailAPIView(APIView):
     permission_classes = [IsAdminRole]
+    serializer_class = CarSerializer
 
     def patch(self, request, pk):
         car = Car.objects.get(pk=pk)
@@ -257,6 +280,7 @@ class AdminCarDetailAPIView(APIView):
 
 class AdminBookingsAPIView(APIView):
     permission_classes = [IsAdminRole]
+    serializer_class = BookingSerializer
 
     def get(self, request):
         expire_stale_bookings()
@@ -266,6 +290,7 @@ class AdminBookingsAPIView(APIView):
 
 class AdminTripsAPIView(APIView):
     permission_classes = [IsAdminRole]
+    serializer_class = TripSerializer
 
     def get(self, request):
         trips = Trip.objects.select_related("user", "car", "bonus_zone").order_by("-started_at")

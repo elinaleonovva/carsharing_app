@@ -22,6 +22,8 @@ class ServiceAccessMixin:
 
 
 class BonusZonesAPIView(ServiceAccessMixin, APIView):
+    serializer_class = BonusZoneSerializer
+
     def get(self, request):
         access_error = self.check_service_access(request)
         if access_error:
@@ -33,6 +35,7 @@ class BonusZonesAPIView(ServiceAccessMixin, APIView):
 
 class AdminTariffAPIView(APIView):
     permission_classes = [IsAdminRole]
+    serializer_class = TariffSerializer
 
     def get(self, request):
         return Response(TariffSerializer(get_tariff()).data)
@@ -47,6 +50,7 @@ class AdminTariffAPIView(APIView):
 
 class AdminCoefficientsAPIView(APIView):
     permission_classes = [IsAdminRole]
+    serializer_class = TimeCoefficientSerializer
 
     def get(self, request):
         return Response(TimeCoefficientSerializer(TimeCoefficient.objects.all(), many=True).data)
@@ -60,6 +64,7 @@ class AdminCoefficientsAPIView(APIView):
 
 class AdminCoefficientDetailAPIView(APIView):
     permission_classes = [IsAdminRole]
+    serializer_class = TimeCoefficientSerializer
 
     def patch(self, request, pk):
         coefficient = TimeCoefficient.objects.get(pk=pk)
@@ -71,6 +76,7 @@ class AdminCoefficientDetailAPIView(APIView):
 
 class AdminBonusZonesAPIView(APIView):
     permission_classes = [IsAdminRole]
+    serializer_class = BonusZoneSerializer
 
     def get(self, request):
         zone = BonusZone.objects.order_by("id").first()
@@ -86,6 +92,7 @@ class AdminBonusZonesAPIView(APIView):
 
 class AdminBonusZoneDetailAPIView(APIView):
     permission_classes = [IsAdminRole]
+    serializer_class = BonusZoneSerializer
 
     def patch(self, request, pk):
         zone = BonusZone.objects.get(pk=pk)

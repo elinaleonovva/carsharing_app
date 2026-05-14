@@ -40,6 +40,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "rest_framework",
     "rest_framework.authtoken",
+    "drf_spectacular",
     "apps.accounts",
     "apps.pricing.apps.PricingConfig",
     "apps.rentals",
@@ -113,10 +114,22 @@ STATIC_ROOT = os.path.join(BASE_DIR, "static/")
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 REST_FRAMEWORK = {
+    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "rest_framework.authentication.TokenAuthentication",
     ],
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.IsAuthenticated",
     ],
+}
+
+ENABLE_API_DOCS = env_bool("DJANGO_ENABLE_API_DOCS", DEBUG)
+API_DOCS_REQUIRE_STAFF = env_bool("DJANGO_API_DOCS_REQUIRE_STAFF", not DEBUG)
+
+SPECTACULAR_SETTINGS = {
+    "TITLE": "Carsharing API",
+    "DESCRIPTION": "API documentation for the carsharing backend.",
+    "VERSION": "1.0.0",
+    "SERVE_INCLUDE_SCHEMA": False,
+    "COMPONENT_SPLIT_REQUEST": True,
 }

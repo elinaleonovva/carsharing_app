@@ -1,5 +1,8 @@
 Django==5.1.4
 djangorestframework==3.15.2
+drf-spectacular==0.27.2
 gunicorn==23.0.0
+hypothesis==6.152.4
 psycopg[binary]==3.2.3
 python-dotenv==1.0.1
+schemathesis==4.17.0

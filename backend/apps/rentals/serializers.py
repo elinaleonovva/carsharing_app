@@ -147,7 +147,7 @@ class AdminUserSerializer(UserSerializer):
     class Meta(UserSerializer.Meta):
         fields = UserSerializer.Meta.fields + ("full_name",)
 
-    def get_full_name(self, obj):
+    def get_full_name(self, obj) -> str:
         return " ".join(
             part for part in [obj.last_name, obj.first_name, obj.patronymic] if part
         )

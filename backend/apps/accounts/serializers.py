@@ -10,6 +10,10 @@ DRIVER_LICENSE_SERIES_RE = re.compile(r"^[0-9A-Za-zА-Яа-яЁё]{4}$")
 PERSON_NAME_RE = re.compile(r"^[A-Za-zА-Яа-яЁё]+(?:[ -][A-Za-zА-Яа-яЁё]+)*$")
 
 
+def contains_null_byte(value: str) -> bool:
+    return "\x00" in value
+
+
 def clean_message(message: str) -> str:
     return message.strip().rstrip(".!?")
 
@@ -105,6 +109,8 @@ class UserSerializer(serializers.ModelSerializer):
 
     def validate_email(self, value):
         email = value.strip().lower()
+        if contains_null_byte(email):
+            raise serializers.ValidationError("Invalid null byte")
         queryset = User.objects.filter(email__iexact=email)
 
         if self.instance is not None:
@@ -227,6 +233,8 @@ class RegisterSerializer(serializers.ModelSerializer):
 
     def validate_email(self, value):
         email = value.strip().lower()
+        if contains_null_byte(email):
+            raise serializers.ValidationError("Invalid null byte")
         existing_user = User.objects.filter(email__iexact=email).first()
 
         if existing_user is None:
@@ -257,7 +265,7 @@ class RegisterSerializer(serializers.ModelSerializer):
         queryset = User.objects.filter(driver_license_number=driver_license_number)
         email = str(self.initial_data.get("email", "")).strip().lower()
 
-        if email:
+        if email and not contains_null_byte(email):
             queryset = queryset.exclude(
                 email__iexact=email,
                 role=User.Role.USER,
@@ -310,6 +318,9 @@ class LoginSerializer(serializers.Serializer):
     def validate(self, attrs):
         email = attrs["email"].strip().lower()
         password = attrs["password"]
+
+        if contains_null_byte(email):
+            raise serializers.ValidationError({"email": "Invalid null byte"})
 
         user = User.objects.filter(email__iexact=email).first()
         if user is None:
