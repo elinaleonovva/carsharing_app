@@ -459,7 +459,7 @@
 
 .coefficient-header-action,
 .coefficient-card .primary-button {
-  flex: 0 0 120px;
+  flex: 0 0 104px;
 }
 
 .coefficient-form-row {
@@ -990,6 +990,7 @@ body {
 
   .coefficient-card {
     align-items: stretch;
+    gap: 12px;
   }
 
   .coefficient-table-header {
@@ -998,6 +999,25 @@ body {
 
   .coefficient-form-row {
     grid-template-columns: 1fr;
+  }
+
+  .coefficient-table {
+    overflow-x: hidden;
+    padding-right: 0;
+  }
+
+  .coefficient-form-row,
+  .coefficient-form-row > div,
+  .coefficient-form-row input {
+    min-width: 0;
+  }
+
+  .coefficient-card .primary-button {
+    align-self: flex-start;
+    width: fit-content;
+    min-width: 0;
+    flex: 0 0 auto;
+    padding: 0 14px;
   }
 
   .button-row {
